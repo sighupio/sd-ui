@@ -1,0 +1,331 @@
+# ============================================================================
+# sd-ui: Headlamp + SIGHUP Distribution UI
+#
+# Quick start:
+#   echo '<YOUR_IP>' > host-ip.txt   # required: your machine's IP for nip.io DNS
+#   mise run up      # create Kind cluster + install SD + sync CA (~10 min)
+#   mise run dev     # start Tilt for Headlamp hot-reload (separate terminal)
+#   Open https://headlamp.<NIP_DOMAIN> (printed during setup)
+#   Login: alice/alice (LDAP via Dex)
+#
+# After IP change or broken state:
+#   mise run nuke    # destroy cluster + wipe CA and furyctl cache
+#   mise run up      # recreate everything from scratch
+#
+# Plugin development:
+#   cd plugins/<name> && npm run build   # Tilt auto-deploys on dist/ change
+#   See: docs/HOW_TO_DEVELOP_A_PLUGIN.md
+#
+# Architecture: docs/DEVELOPMENT.md
+# ============================================================================
+
+[tools]
+node = "22"
+kind = "0.33.0"
+ctlptl = "0.9.6"
+helm = "3.18.3"
+kubectl = "1.36.4"
+furyctl = "0.36.0-rc.4"
+tilt = "0.35.0"
+kustomize = "5.6.0"
+k9s = "0.50.9"
+go = "1.24"
+shellcheck = "0.11.0"
+jq = "1.8.1"
+yq = "4.33.3"
+
+[env]
+# Kind dev environment: exports HOST_IP and NIP_DOMAIN (from host-ip.txt, e.g.
+# 10-250-250-137.nip.io), KUBECONFIG (dev/kind/state/kubeconfig) and the KIND_* paths.
+_.source = "./dev/kind/env.sh"
+
+# Compatibility/e2e validation tasks live in a dedicated file (test:* tasks); the opt-in
+# OnPremises dev environment (onprem:* tasks) too.
+[task_config]
+includes = ["tests/e2e/tasks.toml", "dev/onprem/tasks.toml"]
+
+# === Cluster Lifecycle (low-level, prefer `up`/`down`/`nuke` instead) ===
+
+[tasks.cluster-up]
+description = "create kind cluster with local registry"
+# Creates Kind cluster with AuthenticationConfiguration for OIDC (Dex),
+# configures containerd registry mirrors, labels StorageClass for Capsule,
+# and creates cert-manager CA secret. Generates the CA, secrets and templates itself.
+run = "./dev/kind/scripts/create-cluster.sh"
+
+[tasks.cluster-down]
+description = "teardown kind cluster and registry"
+run = "./dev/kind/scripts/teardown.sh"
+
+[tasks.cache-up]
+description = "start registry cache proxy (persistent across cluster rebuilds)"
+# Docker registry mirrors that cache images from registries (ghcr.io, docker.io, etc.)
+# Survives cluster rebuilds — run once, speeds up subsequent `up` commands.
+run = "./dev/kind/scripts/start-registry-cache.sh"
+
+[tasks.cache-down]
+description = "stop registry cache proxy"
+run = "docker compose -f ./dev/kind/registry-cache/docker-compose.yaml down"
+
+# === Certificate, Secret and Template Generation ===
+# Everything generated lives in dev/kind/state/ (gitignored); `clean` deletes it.
+
+[tasks.generate-ca]
+description = "generate dev CA if not exists"
+# Creates a self-signed CA in dev/kind/state/certs/ used by:
+# - kube-apiserver AuthenticationConfiguration (trusts Dex OIDC)
+# - cert-manager ClusterIssuer (signs all ingress TLS certs)
+# - Pomerium and Gangplank (trust Dex TLS)
+# Only generates if ca.crt doesn't exist. Delete with `clean` to force regeneration.
+run = "./dev/lib/generate-ca.sh ./dev/kind/state/certs sd-ui-dev-ca"
+
+[tasks.generate-secrets]
+description = "generate Pomerium and gangplank secrets if not exist"
+# Writes dev/kind/state/secrets/ (mode 600). Never rotates an existing secret.
+run = "./dev/kind/scripts/generate-secrets.sh"
+
+[tasks.sd-spec]
+description = "apply the headlamp/sd-spec ConfigMap the plugins read, from dev/kind/furyctl.yaml"
+# The distribution renders it only with its own Headlamp (OnPremises/Immutable), not on Kind.
+# `up` runs it after the furyctl apply; rerun it after editing dev/kind/furyctl.yaml.
+run = "./dev/kind/scripts/apply-sd-spec.sh"
+
+[tasks.generate-templates]
+description = "generate CA, secrets and dynamic config files from templates"
+# Generates the CA and secrets if missing, then runs envsubst on the .tpl files:
+# kind-config.yaml, auth-config.yaml, gangplank configs, users.ldif, capsule-proxy
+# ingress, Headlamp Tilt overlays.
+# Must be re-run when IP changes (update host-ip.txt first).
+run = "./dev/kind/scripts/generate-templates.sh"
+
+[tasks.sync-capsule-ca]
+description = "copy capsule-proxy CA + dev CA to headlamp namespace"
+# Creates headlamp-ca-bundle secret (Capsule Proxy CA + dev CA combined)
+# so Headlamp can verify TLS when talking to Capsule Proxy.
+# Run after furyctl-apply (which creates Capsule and its CA).
+run = "./dev/kind/scripts/sync-capsule-ca.sh"
+
+# === SIGHUP Distribution ===
+
+[tasks.furyctl-apply]
+description = "run furyctl apply on the distribution"
+# Installs/updates the SIGHUP Distribution (Cilium, Prometheus, Pomerium, etc.)
+# and furyctl kustomize plugins (RBAC for Capsule users, tenants, LDAP server).
+# Uses kapp under the hood — safe to re-run (idempotent).
+# Config: dev/kind/furyctl.yaml (reads the generated secrets and CA from dev/kind/state/,
+# hence the generate-templates dependency).
+# Set FURYCTL_DISTRO_LOCATION to apply from a local distribution checkout
+# (e.g. to test an unreleased distribution branch).
+depends = ["generate-templates"]
+run = 'furyctl apply --disable-analytics --outdir "$PWD" -c ./dev/kind/furyctl.yaml ${FURYCTL_DISTRO_LOCATION:+--distro-location "$FURYCTL_DISTRO_LOCATION"}'
+
+[tasks.furyctl-apply-dry]
+description = "run furyctl apply dry-run"
+depends = ["generate-templates"]
+run = 'furyctl apply --disable-analytics --dry-run --outdir "$PWD" -c ./dev/kind/furyctl.yaml ${FURYCTL_DISTRO_LOCATION:+--distro-location "$FURYCTL_DISTRO_LOCATION"}'
+
+# === Environment Lifecycle (use these!) ===
+
+[tasks.up]
+description = "create kind cluster, install distribution, deploy showcase apps (~10-15 min first time)"
+# Applies dev/kind/furyctl.yaml AS-IS — the user owns that file; it is never rendered or
+# overwritten here. Capsule presence is auto-detected from it (startup.sh greps for the
+# Capsule Helm chart) and drives the workflow: Capsule-CA sync, users.ldif group,
+# demo-apps path, Headlamp overlay. To run without Capsule, edit dev/kind/furyctl.yaml
+# (see tests/e2e for the no-Capsule shape). After this, run `mise run dev` in another
+# terminal. (Scenario templating lives only in the e2e harness — see tests/e2e.)
+run = "./dev/kind/scripts/startup.sh"
+
+[tasks.down]
+description = "teardown dev environment (keeps registry cache)"
+run = "./dev/kind/scripts/teardown.sh"
+
+[tasks.clean]
+description = "remove dev/kind/state/ + furyctl cache (forces full regeneration on next up)"
+# Use when the environment is broken after IP change or CA mismatch, after `down`.
+# Removes: .furyctl/sd-ui/ (rendered manifests) + dev/kind/state/ (CA, secrets,
+# kubeconfig, rendered cluster config, tenant login artifacts).
+# Does NOT remove registry cache — that's persistent on purpose.
+run = """
+rm -rf .furyctl/sd-ui/ dev/kind/state/
+echo '[clean] Removed furyctl cache + dev/kind/state/'
+"""
+
+[tasks.nuke]
+description = "down + clean: destroy everything and wipe state for a fresh start"
+# The nuclear option. Use when: IP changed, tokens invalid after rebuild,
+# CA mismatch, or anything else that a simple down+up doesn't fix.
+# After nuke, run `mise run up` to recreate everything.
+# Sequential on purpose: `down` needs dev/kind/state/kind-config.yaml, which `clean` deletes
+# (mise runs `depends` in parallel).
+run = "mise run down && mise run clean"
+
+# === Development (interactive session) ===
+
+[tasks.dev]
+description = "start tilt for Headlamp hot-reload"
+# Tilt watches plugins/*/dist/ and plugins/*/package.json (ignores src/, node_modules/).
+# When dist/main.js changes (after `npm run build`), Tilt rebuilds the Docker image
+# and redeploys the Headlamp pod automatically.
+# Access Headlamp at https://headlamp.<NIP_DOMAIN>
+run = "tilt up"
+
+# === Plugin Build/Test/Lint ===
+# Each SD plugin (plugins/sd-*/) is an independent npm project.
+# headlamp-reevo-theme is pre-built and excluded from these tasks.
+# For a single plugin: cd plugins/<name> && npm install && npm run tsc && npm run build
+
+[tasks.plugins-install]
+description = "install dependencies for all SD plugins"
+run = """
+for dir in plugins/sd-*/; do
+  echo "=== Installing $(basename $dir) ==="
+  (cd "$dir" && npm install) || exit 1
+done
+echo "All plugin dependencies installed"
+"""
+
+[tasks.plugins-build]
+description = "build all SD plugins (tsc + lint + build)"
+depends = ["plugins-install"]
+run = """
+for dir in plugins/sd-*/; do
+  echo "=== Building $(basename $dir) ==="
+  (cd "$dir" && npm run tsc && npm run lint && npm run build) || exit 1
+done
+echo "All plugins built successfully"
+"""
+
+[tasks.plugins-lint]
+description = "lint all SD plugins"
+run = """
+for dir in plugins/sd-*/; do
+  echo "=== Linting $(basename $dir) ==="
+  (cd "$dir" && npm run lint) || exit 1
+done
+"""
+
+[tasks.plugins-check-shared]
+description = "check that the files shared by every SD plugin are identical"
+run = """
+rc=0
+for file in sdSpec.ts sdSpec.test.ts; do
+  for dir in plugins/sd-*/; do
+    [ -f "$dir/src/$file" ] || continue
+    if ! diff -q plugins/sd-core/src/$file "$dir/src/$file" >/dev/null; then
+      echo "$dir/src/$file differs from plugins/sd-core/src/$file"
+      rc=1
+    fi
+  done
+done
+exit $rc
+"""
+
+[tasks.plugins-tsc]
+description = "type-check all SD plugins"
+run = """
+for dir in plugins/sd-*/; do
+  echo "=== Type-checking $(basename $dir) ==="
+  (cd "$dir" && npm run tsc) || exit 1
+done
+"""
+
+# === Shell Scripts ===
+
+[tasks.lint-scripts]
+description = "shellcheck every shell script of the dev environments and the tests"
+# Config: .shellcheckrc (source directives are relative to the script).
+run = "find dev tests -name '*.sh' -print0 | xargs -0 shellcheck"
+
+# === Desktop App Build ===
+# Builds Headlamp Electron desktop app for macOS with SD plugins bundled.
+# Requires Go (for headlamp-server backend) and Node.js (both managed by mise).
+# First run clones headlamp and installs deps (~15 min). Subsequent runs ~5 min.
+# Output: .build/headlamp-desktop/app/dist/
+
+[tasks.desktop-build]
+description = "build Headlamp desktop app with SD plugins for macOS"
+depends = ["plugins-build"]
+run = """
+set -e
+HEADLAMP_VERSION="v0.40.1"
+HEADLAMP_DIR=".build/headlamp-desktop"
+
+# Clone headlamp (shallow, single branch)
+if [ ! -d "$HEADLAMP_DIR" ]; then
+  echo "=== Cloning Headlamp $HEADLAMP_VERSION ==="
+  mkdir -p .build
+  git clone --depth 1 --branch "$HEADLAMP_VERSION" https://github.com/kubernetes-sigs/headlamp.git "$HEADLAMP_DIR"
+fi
+
+# Copy SD plugins to .plugins/ (where Headlamp loads them from)
+echo "=== Copying SD plugins ==="
+rm -rf "$HEADLAMP_DIR/.plugins"
+mkdir -p "$HEADLAMP_DIR/.plugins"
+
+for dir in plugins/sd-*/; do
+  name=$(basename "$dir")
+  mkdir -p "$HEADLAMP_DIR/.plugins/$name"
+  cp "$dir/dist/main.js" "$HEADLAMP_DIR/.plugins/$name/main.js"
+  cp "$dir/package.json" "$HEADLAMP_DIR/.plugins/$name/package.json"
+done
+
+# headlamp-reevo-theme (pre-built, flat structure)
+mkdir -p "$HEADLAMP_DIR/.plugins/headlamp-reevo-theme"
+cp plugins/headlamp-reevo-theme/main.js "$HEADLAMP_DIR/.plugins/headlamp-reevo-theme/main.js"
+cp plugins/headlamp-reevo-theme/package.json "$HEADLAMP_DIR/.plugins/headlamp-reevo-theme/package.json"
+
+# Install deps and build
+echo "=== Installing Headlamp dependencies ==="
+cd "$HEADLAMP_DIR"
+npm install
+npm run frontend:install
+npm run app:install
+
+# Build Go backend (needs mise-managed Go in PATH)
+echo "=== Building Go backend ==="
+cd backend && go build -o ./headlamp-server ./cmd && cd ..
+
+# Patch build-backend.js to skip Go rebuild (already built above, Go not in npm PATH)
+cat > app/scripts/build-backend.js << 'PATCH'
+'use strict';
+const fs = require('fs');
+const path = require('path');
+exports.default = async () => {
+  const p = path.join('..', 'backend', 'headlamp-server');
+  if (fs.existsSync(p)) { console.log('Backend already built, skipping...'); return; }
+  throw new Error('Backend not found. Build it first with: cd backend && go build -o ./headlamp-server ./cmd');
+};
+PATCH
+
+# Build desktop app for macOS
+echo "=== Building Headlamp Desktop ==="
+npm run app:package:mac
+
+echo "=== Done ==="
+echo "Output:"
+ls -la app/dist/*.dmg 2>/dev/null || ls -d app/dist/mac*/ 2>/dev/null
+"""
+
+# === Demo Apps (Capsule tenant workloads for testing) ===
+
+[tasks.demo-apps]
+description = "deploy sample apps in Capsule tenant (OIDC login + 3 apps + pod-killer chaos)"
+run = "./dev/kind/scripts/deploy-demo-apps.sh"
+
+[tasks.opensearch-index-patterns]
+description = "run index-patterns-cronjob now so OSD Discover deep links work (opensearch flavor only)"
+# index-patterns-cronjob only fires on the hour and never on creation, so a fresh cluster
+# has no index patterns and every OSD Discover link (sd-loki-links' "View logs in
+# OpenSearch" button) reports SavedObjectNotFound until it runs. `up` already does this;
+# re-run it by hand after recreating the logging module. No-op on non-opensearch flavors.
+run = "./dev/kind/scripts/seed-opensearch-index-patterns.sh"
+
+[tasks.demo-apps-down]
+description = "remove all demo app namespaces"
+run = """
+for ns in shop sock-shop chaos-test; do
+  kubectl --kubeconfig=./dev/kind/state/capsule-user/kubeconfig delete namespace "$ns" --ignore-not-found
+done
+echo "Demo app namespaces removed"
+"""

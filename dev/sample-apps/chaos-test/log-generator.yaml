@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: log-generator
+  template:
+    metadata:
+      labels:
+        app: log-generator
+    spec:
+      containers:
+        - name: logger
+          image: busybox:1.37
+          command:
+            - /bin/sh
+            - -c
+            - |
+              while true; do
+                echo "$(date -u +%FT%TZ) level=info msg=\"Processing request\" service=demo latency=$((RANDOM % 500))ms status=$((200 + (RANDOM % 4) * 100))"
+                sleep 5
+              done
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 10m
+              memory: 32Mi

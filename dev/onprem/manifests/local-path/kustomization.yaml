@@ -1,0 +1,22 @@
+# Copyright (c) 2017-present SIGHUP s.r.l All rights reserved.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file.
+
+# Default StorageClass for the OnPremises dev environment: rancher local-path-provisioner
+# (node-local hostPath volumes). OnPremises clusters ship without storage, and the logging,
+# monitoring and dr modules need PersistentVolumes. Applied by startup.sh with kubectl
+# between the kubernetes and the distribution phases.
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - https://github.com/rancher/local-path-provisioner//deploy?ref=v0.0.37
+patches:
+  - target:
+      kind: StorageClass
+      name: local-path
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          storageclass.kubernetes.io/is-default-class: "true"

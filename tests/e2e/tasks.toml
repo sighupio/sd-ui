@@ -1,0 +1,73 @@
+# ============================================================================
+# SD-UI compatibility / e2e validation tasks (mise *task file*, included from
+# the root mise.toml via task_config.includes). Run from the repo root.
+#
+# A *scenario* is a set of module flavors. ONE generic provision task renders
+# the whole furyctl.yaml for the scenario and fresh-installs it (reusing the
+# running cluster only when the committed furyctl.yaml already matches). ONE
+# validate task checks every category against the live cluster.
+#
+#   MONITORING_TYPE=mimir LOGGING_TYPE=opensearch mise run "test:scenario"
+#
+# Env vars:
+#   MONITORING_TYPE          none | prometheus | prometheusAgent | mimir   (default prometheus)
+#   LOGGING_TYPE             none | loki | opensearch                      (default loki)
+#                            (customOutputs is NOT provisionable — static-only gap)
+#   LOGGING_OPENSEARCH_TYPE  single | triple                              (default single)
+#   POLICY_TYPE              none | kyverno | gatekeeper                   (default kyverno)
+#   CAPSULE                  true | false                                 (default true)
+#                            false = Capsule-free (SSO + OIDC pass-through to the
+#                            API server, no tenant isolation); use PROBE_MODE=headlamp.
+#   APPROVE_DOWN=1           allow tearing down a running, non-matching cluster
+#   CATEGORIES               subset to validate (default: all — monitoring logging policy)
+#   EXPECTED_<CAT>_TYPE      assert the live flavor for a category
+#
+# Env (KUBECONFIG, NIP_DOMAIN, ...) is inherited from the root mise.toml.
+# ============================================================================
+
+["test:provision"]
+description = "provision a FRESH cluster for the scenario (env: MONITORING_TYPE/LOGGING_TYPE/LOGGING_OPENSEARCH_TYPE; reuse if committed furyctl.yaml matches; teardown needs APPROVE_DOWN=1)"
+dir = "{{config_root}}"
+shell = "bash -c"
+run = """
+set -euo pipefail
+source tests/e2e/lib.sh
+provision_cluster
+"""
+
+["test:validate"]
+description = "validate SD-UI plugins for all categories against the live cluster (read-only; CATEGORIES / EXPECTED_<CAT>_TYPE optional)"
+dir = "{{config_root}}"
+run = "bash tests/e2e/validate.sh"
+
+["test:scenario"]
+description = "provision a scenario then validate it end-to-end"
+dir = "{{config_root}}"
+shell = "bash -c"
+run = """
+set -euo pipefail
+mon="${MONITORING_TYPE:-prometheus}"
+log="${LOGGING_TYPE:-loki}"
+ost="${LOGGING_OPENSEARCH_TYPE:-single}"
+pol="${POLICY_TYPE:-kyverno}"
+cap="${CAPSULE:-true}"
+CAPSULE="$cap" MONITORING_TYPE="$mon" LOGGING_TYPE="$log" LOGGING_OPENSEARCH_TYPE="$ost" POLICY_TYPE="$pol" mise run "test:provision"
+CAPSULE="$cap" EXPECTED_MONITORING_TYPE="$mon" EXPECTED_LOGGING_TYPE="$log" EXPECTED_POLICY_TYPE="$pol" mise run "test:validate"
+"""
+
+# Capsule-free scenario: same modules, but Capsule is not installed (SSO + OIDC
+# pass-through straight to the API server). PROBE_MODE=headlamp is backend-agnostic
+# (Pomerium -> Headlamp -> API server), so the category checks are reused as-is.
+["test:scenario-no-capsule"]
+description = "provision a Capsule-FREE scenario then validate it end-to-end (CAPSULE=false)"
+dir = "{{config_root}}"
+shell = "bash -c"
+run = """
+set -euo pipefail
+CAPSULE=false PROBE_MODE=headlamp \
+  MONITORING_TYPE="${MONITORING_TYPE:-prometheus}" \
+  LOGGING_TYPE="${LOGGING_TYPE:-loki}" \
+  LOGGING_OPENSEARCH_TYPE="${LOGGING_OPENSEARCH_TYPE:-single}" \
+  POLICY_TYPE="${POLICY_TYPE:-kyverno}" \
+  mise run "test:scenario"
+"""

@@ -1,0 +1,34 @@
+{
+  "name": "sd-alerts",
+  "version": "0.1.0",
+  "description": "Prometheus alerts dashboard for SIGHUP Distribution",
+  "scripts": {
+    "start": "headlamp-plugin start",
+    "build": "headlamp-plugin build",
+    "format": "headlamp-plugin format",
+    "lint": "headlamp-plugin lint",
+    "lint-fix": "headlamp-plugin lint --fix",
+    "tsc": "headlamp-plugin tsc",
+    "test": "headlamp-plugin test"
+  },
+  "prettier": "@headlamp-k8s/eslint-config/prettier-config",
+  "eslintConfig": {
+    "extends": [
+      "@headlamp-k8s",
+      "prettier",
+      "plugin:jsx-a11y/recommended"
+    ]
+  },
+  "overrides": {
+    "typescript": "5.6.2"
+  },
+  "devDependencies": {
+    "@kinvolk/headlamp-plugin": "^0.13.1"
+  },
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sighupio/sd-ui.git",
+    "directory": "plugins/sd-alerts"
+  }
+}

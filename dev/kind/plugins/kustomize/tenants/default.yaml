@@ -1,0 +1,27 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: default
+spec:
+  owners:
+  - name: alice@sighup.io
+    kind: User
+    proxySettings:
+    - kind: IngressClasses
+      operations:
+      - List
+    - kind: StorageClasses
+      operations:
+      - List
+    - kind: Nodes
+      operations:
+      - List
+  ingressOptions:
+    allowedClasses:
+      allowed:
+        - nginx
+  storageClasses:
+    allowed:
+      - standard
+  namespaceOptions:
+    quota: 10

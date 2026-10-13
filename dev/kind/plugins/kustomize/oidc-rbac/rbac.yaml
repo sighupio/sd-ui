@@ -1,0 +1,90 @@
+# RBAC for the Capsule-free dev scenario (CAPSULE=false).
+#
+# WHO: the `sd-ui-users` OIDC group (carried in the user's `groups` claim from
+# Dex/LDAP in this scenario). NOT capsule.clastix.io — Capsule is not installed.
+#
+# WHAT: cluster-wide READ. Without Capsule Proxy there is no per-namespace list
+# filter in vanilla RBAC, so the useList()-based plugins (sd-core landing,
+# sd-events, sd-logs, sd-policy) need cluster-wide list. This is an ops/SRE-scope
+# grant — every bound user sees the whole cluster — NOT tenant isolation.
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sd-ui-reader
+rules:
+  - apiGroups: [""]
+    resources:
+      - namespaces
+      - nodes
+      - pods
+      - services
+      - events
+      - endpoints
+      - persistentvolumeclaims
+      # Includes headlamp/sd-spec, the distribution summary every SD plugin reads.
+      - configmaps
+    verbs: ["get", "list", "watch"]
+  # sd-core landing-page node CPU/memory tiles (Node.useMetrics -> metrics.k8s.io).
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets", "statefulsets", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["wgpolicyk8s.io"]
+    resources: ["policyreports", "clusterpolicyreports"]
+    verbs: ["get", "list"]
+  - apiGroups: ["constraints.gatekeeper.sh"]
+    resources: ["*"]
+    verbs: ["get", "list"]
+  - apiGroups: ["velero.io"]
+    resources: ["backups", "schedules", "restores"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sd-ui-reader
+subjects:
+  - kind: Group
+    name: sd-ui-users
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sd-ui-reader
+---
+# services/proxy to the observability backends (sd-logs, sd-certificates, sd-events).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sd-ui-service-proxy
+rules:
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    resourceNames:
+      - "loki-stack"
+      - "loki-stack:3100"
+      - "prometheus-k8s"
+      - "prometheus-k8s:9090"
+      - "opensearch-cluster-master"
+      - "opensearch-cluster-master:9200"
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sd-ui-service-proxy
+subjects:
+  - kind: Group
+    name: sd-ui-users
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sd-ui-service-proxy

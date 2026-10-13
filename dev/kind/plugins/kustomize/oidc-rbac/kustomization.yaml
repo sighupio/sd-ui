@@ -1,0 +1,11 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Dev RBAC for the Capsule-free (CAPSULE=false) scenario. Applied by furyctl in
+# place of capsule-rbac when Capsule is not installed. Grants the SD-UI plugins'
+# read access to the `sd-ui-users` OIDC group (the neutral group the LDAP users
+# carry in that scenario — never capsule.clastix.io). This is the in-repo
+# counterpart of module-utilities examples/oidc-rbac/rbac.yaml, bound to the dev group.
+resources:
+  - rbac.yaml

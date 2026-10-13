@@ -1,0 +1,236 @@
+# ============================================================================
+# furyctl.yaml TEMPLATE for compatibility / e2e testing.
+#
+# Rendered by tests/e2e/lib.sh -> render_furyctl(): envsubst substitutes ONLY
+# the variables below, then the header (everything before `apiVersion:`) is
+# stripped so the committed dev/kind/furyctl.yaml is clean and comment-free.
+# The BODY of this template must therefore stay comment-free (full-line `#`
+# comments below `apiVersion:` would leak into the rendered file). The only
+# exception is the commented-out `utilities` example, intentionally kept in
+# the rendered file too.
+#
+# DEV-ONLY: the inline credentials below (MinIO root users, the demo LDAP bind
+# password) belong to throwaway in-cluster demo services. Real secrets (Pomerium,
+# the gangplank Dex client) are generated per machine into dev/kind/state/secrets/
+# by dev/kind/scripts/generate-secrets.sh and read with {file://...}.
+#
+# This is a SUPERSET config: every flavor's sub-block is present and valid, so
+# only the `type` fields are switched — the same pattern the distribution
+# already uses (loki+opensearch, kyverno+gatekeeper both present).
+#
+# Substituted variables (see tests/e2e/tasks.toml):
+#   MONITORING_TYPE          none | prometheus | prometheusAgent | mimir
+#   LOGGING_TYPE             none | loki | opensearch
+#                            (customOutputs is intentionally NOT provisioned —
+#                             it needs hand-written Output CRs and deploys no
+#                             queryable backend; see docs/SD_COMPATIBILITY.md)
+#   LOGGING_OPENSEARCH_TYPE  single | triple
+#   POLICY_TYPE              none | kyverno | gatekeeper
+#
+# Capsule toggle (marker-based, NOT envsubst): render_furyctl strips the
+# `#<capsule-only>` / `#<no-capsule-only>` blocks (and all marker lines) based
+# on CAPSULE (default true). CAPSULE=false -> no Capsule Helm release / RBAC /
+# tenants / proxy ingress; the oidc-rbac plugin is used instead.
+#
+# Monitoring toggle (marker-based, same mechanism): `#<monitoring-only>` blocks
+# are stripped when MONITORING_TYPE=none (they patch resources that the
+# monitoring module deploys, so the patch would have no target).
+# ============================================================================
+apiVersion: kfd.sighup.io/v1alpha2
+kind: KFDDistribution
+metadata:
+  name: sd-ui
+spec:
+  distributionVersion: v1.36.0
+  distribution:
+    kubeconfig: "{env://KUBECONFIG}"
+    common:
+      networkPoliciesEnabled: false
+    modules:
+      networking:
+        type: cilium
+        cilium:
+          podCidr: 10.244.0.0/16
+          maskSize: "24"
+      ingress:
+        baseDomain: "{env://NIP_DOMAIN}"
+        nginx:
+          type: single
+          tls:
+            provider: certManager
+        certManager:
+          clusterIssuer:
+            name: letsencrypt-fury
+            email: dev@sighup.io
+            type: http01
+      logging:
+        type: ${LOGGING_TYPE}
+        minio:
+          storageSize: 20Gi
+          rootUser:
+            username: minio
+            password: minio123
+        loki:
+          backend: minio
+          tsdbStartDate: "2026-03-19"
+        opensearch:
+          type: ${LOGGING_OPENSEARCH_TYPE}
+          storageSize: 20Gi
+      monitoring:
+        type: ${MONITORING_TYPE}
+        prometheus:
+          retentionTime: 3d
+          retentionSize: 5GiB
+          storageSize: 5Gi
+        prometheusAgent:
+          remoteWrite: []
+        mimir:
+          retentionTime: 3d
+          backend: minio
+        minio:
+          storageSize: 20Gi
+          rootUser:
+            username: minio
+            password: minio123
+      tracing:
+        type: none
+        minio:
+          storageSize: 20Gi
+          rootUser:
+            username: minio
+            password: minio123
+      # utilities is supported only by OnPremises/Immutable in v1.36
+      # (not KFDDistribution), so it's commented out.
+      # utilities:
+      #   headlamp:
+      #     type: sso
+      #     oidcGroup: <oidc-group>
+      #     # Alternative: token-auth, binds the Headlamp ServiceAccount to an existing ClusterRole
+      #     # type: token-auth
+      #     # clusterRole: view
+      policy:
+        type: ${POLICY_TYPE}
+        kyverno:
+          additionalExcludedNamespaces: ["local-path-storage"]
+          validationFailureAction: Audit
+          installDefaultPolicies: true
+        gatekeeper:
+          additionalExcludedNamespaces: ["local-path-storage"]
+          enforcementAction: warn
+          installDefaultPolicies: true
+      dr:
+        type: on-premises
+        velero: {}
+      auth:
+        provider:
+          type: sso
+        pomerium:
+          policy: |
+            - from: https://headlamp.{env://NIP_DOMAIN}
+              to: http://headlamp.headlamp.svc.cluster.local:80
+              set_request_headers:
+                Authorization: "Bearer ${pomerium.id_token}"
+              allow_websockets: true
+              preserve_host_header: true
+              policy:
+                - allow:
+                    and:
+                      - authenticated_user: true
+          secrets:
+            COOKIE_SECRET: "{file://./state/secrets/pomerium/cookie_secret.txt}"
+            IDP_CLIENT_SECRET: "{file://./state/secrets/pomerium/idp_client_secret.txt}"
+            SHARED_SECRET: "{file://./state/secrets/pomerium/shared_secret.txt}"
+            SIGNING_KEY: "{file://./state/secrets/pomerium/signing_key.txt}"
+        baseDomain: "{env://NIP_DOMAIN}"
+        oidcTrustedCA: "{file://./state/certs/ca.crt}"
+        dex:
+          additionalStaticClients:
+            - id: oidc-auth-client
+              name: "OIDC Kubernetes Auth"
+              redirectURIs:
+                - "https://gangplank.{env://NIP_DOMAIN}/callback"
+              secret: "{file://./state/secrets/gangplank/client_secret.txt}"
+          connectors:
+            - type: ldap
+              id: ldap
+              name: LDAP
+              config:
+                host: ldap-server.demo-ldap.svc:389
+                insecureNoSSL: true
+                bindDN: CN=admin,DC=sighup,DC=io
+                bindPW: admin
+                userSearch:
+                  baseDN: ou=people,DC=sighup,DC=io
+                  filter: "(objectClass=person)"
+                  username: cn
+                  idAttr: cn
+                  emailAttr: mail
+                  nameAttr: displayName
+                groupSearch:
+                  baseDN: DC=sighup,DC=io
+                  filter: "(objectClass=groupOfNames)"
+                  userMatchers:
+                    - userAttr: DN
+                      groupAttr: member
+                  nameAttr: cn
+    customPatches:
+      patches:
+        - patch: |-
+            - op: replace
+              path: /metadata/annotations/cert-manager.io~1cluster-issuer
+              value: kind-ca
+          target:
+            kind: Ingress
+        - patch: |-
+            - op: add
+              path: /metadata/labels/kubernetes.io~1metadata.name
+              value: nginx
+          target:
+            kind: IngressClass
+            name: nginx
+#<monitoring-only>
+      patchesStrategicMerge:
+        - |
+          $patch: delete
+          apiVersion: apps/v1
+          kind: DaemonSet
+          metadata:
+            name: x509-certificate-exporter-control-plane
+            namespace: monitoring
+#</monitoring-only>
+  plugins:
+#<capsule-only>
+    helm:
+      repositories:
+        - name: projectcapsule
+          url: https://projectcapsule.github.io/charts
+      releases:
+        - name: capsule
+          namespace: capsule-system
+          chart: projectcapsule/capsule
+          version: "0.12.4"
+          disableValidationOnInstall: true
+          values:
+            - ./plugins/helm/capsule/values.yaml
+#</capsule-only>
+    kustomize:
+      - name: kind-ca-issuer
+        folder: ./plugins/kustomize/kind-ca-issuer
+      - name: ldap-server
+        folder: ./plugins/kustomize/ldap-server
+#<capsule-only>
+      - name: capsule-rbac
+        folder: ./plugins/kustomize/capsule-rbac
+      - name: tenants
+        folder: ./plugins/kustomize/tenants
+#</capsule-only>
+      - name: gangplank
+        folder: ./plugins/kustomize/gangplank
+#<capsule-only>
+      - name: capsule-proxy-ingress
+        folder: ./plugins/kustomize/capsule-proxy-ingress
+#</capsule-only>
+#<no-capsule-only>
+      - name: oidc-rbac
+        folder: ./plugins/kustomize/oidc-rbac
+#</no-capsule-only>

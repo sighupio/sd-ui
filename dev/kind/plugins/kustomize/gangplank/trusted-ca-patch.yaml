@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gangplank
+spec:
+  template:
+    spec:
+      containers:
+      - name: gangplank
+        volumeMounts:
+        - name: trusted-ca
+          mountPath: "/tls/ca.crt"
+          subPath: ca.crt
+      volumes:
+      - name: trusted-ca
+        secret:
+          secretName: oidc-trusted-ca
+          items:
+          - key: ca.crt
+            path: ca.crt
