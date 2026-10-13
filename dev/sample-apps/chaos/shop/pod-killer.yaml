@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pod-killer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-killer
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-killer
+subjects:
+  - kind: ServiceAccount
+    name: pod-killer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pod-killer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-killer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pod-killer
+  template:
+    metadata:
+      labels:
+        app: pod-killer
+    spec:
+      serviceAccountName: pod-killer
+      containers:
+        - name: killer
+          image: alpine/k8s:1.31.4
+          command:
+            - /bin/sh
+            - -c
+            - |
+              while true; do
+                SLEEP=$((60 + RANDOM % 240))
+                echo "[pod-killer] Sleeping ${SLEEP}s..."
+                sleep $SLEEP
+                TARGET=$(kubectl get pods --field-selector=status.phase=Running -o name | grep -v "pod-killer" | shuf -n 1)
+                if [ -n "$TARGET" ]; then
+                  echo "[pod-killer] Killing: $TARGET"
+                  kubectl delete "$TARGET" --grace-period=5
+                else
+                  echo "[pod-killer] No running pods to kill"
+                fi
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi

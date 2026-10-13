@@ -1,0 +1,59 @@
+services:
+  mirror-dockerio:
+    image: registry:2
+    container_name: mirror-dockerio
+    restart: always
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
+    volumes:
+      - ./data/dockerio:/var/lib/registry
+    networks:
+      - kind
+
+  mirror-ghcr:
+    image: registry:2
+    container_name: mirror-ghcr
+    restart: always
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://ghcr.io
+    volumes:
+      - ./data/ghcr:/var/lib/registry
+    networks:
+      - kind
+
+  mirror-registryk8s:
+    image: registry:2
+    container_name: mirror-registryk8s
+    restart: always
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://registry.k8s.io
+    volumes:
+      - ./data/registryk8s:/var/lib/registry
+    networks:
+      - kind
+
+  mirror-sighup:
+    image: registry:2
+    container_name: mirror-sighup
+    restart: always
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://registry.sighup.io
+    volumes:
+      - ./data/sighup:/var/lib/registry
+    networks:
+      - kind
+
+  mirror-quay:
+    image: registry:2
+    container_name: mirror-quay
+    restart: always
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://quay.io
+    volumes:
+      - ./data/quay:/var/lib/registry
+    networks:
+      - kind
+
+networks:
+  kind:
+    external: true

@@ -1,0 +1,104 @@
+# Copyright (c) 2017-present SIGHUP s.r.l All rights reserved.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file.
+
+# OnPremises dev environment: furyctl `kind: OnPremises` on Lima VMs (Apple Silicon macOS).
+# Opt-in and independent from `mise run up`.
+#
+# Every script sources dev/onprem/env.sh and passes --kubeconfig explicitly: the global
+# [env] KUBECONFIG/NIP_DOMAIN of mise.toml are never used by these tasks.
+
+# === Lifecycle ===
+
+["onprem:up"]
+description = "OnPremises env: create/start Lima VMs, registry, dev image, install the cluster and the distribution (idempotent)"
+dir = "{{config_root}}"
+run = "bash dev/onprem/scripts/startup.sh all"
+
+["onprem:down"]
+description = "OnPremises env: stop the Lima VMs (disks kept; onprem:up starts them again)"
+dir = "{{config_root}}"
+run = "bash dev/onprem/scripts/teardown.sh"
+
+["onprem:nuke"]
+description = "OnPremises env: delete the Lima VMs, the local registry and dev/onprem/state/"
+dir = "{{config_root}}"
+run = "bash dev/onprem/scripts/teardown.sh --nuke"
+
+# === Single steps ===
+
+["onprem:vms-up"]
+description = "OnPremises env: create/start the Lima VMs only and record their IPs"
+dir = "{{config_root}}"
+run = "bash dev/onprem/scripts/vms-up.sh"
+
+["onprem:registry-up"]
+description = "OnPremises env: start the local image registry (127.0.0.1:5001, host.lima.internal:5001 from the VMs)"
+dir = "{{config_root}}"
+run = "bash dev/onprem/scripts/registry.sh up"
+
+["onprem:registry-down"]
+description = "OnPremises env: remove the local image registry"
+dir = "{{config_root}}"
+run = "bash dev/onprem/scripts/registry.sh down"
+
+["onprem:render"]
+description = "OnPremises env: render dev/onprem/state/furyctl.yaml from the template"
+dir = "{{config_root}}"
+run = "bash dev/onprem/scripts/render.sh"
+
+["onprem:image"]
+description = "OnPremises env: build the SD-UI image from plugins/*/dist (arm64), push it and roll it out"
+dir = "{{config_root}}"
+run = "bash dev/onprem/scripts/image.sh"
+
+["onprem:apply"]
+description = "OnPremises env: re-render the config and re-apply the distribution and plugins phases"
+dir = "{{config_root}}"
+run = "bash dev/onprem/scripts/startup.sh apply"
+
+# === Access ===
+
+["onprem:env"]
+description = "OnPremises env: print the KUBECONFIG export (eval \"$(mise run -q onprem:env)\")"
+dir = "{{config_root}}"
+shell = "bash -c"
+run = '''
+source dev/onprem/env.sh
+echo "export KUBECONFIG=$ONPREM_KUBECONFIG"
+'''
+
+["onprem:kubectl"]
+description = "OnPremises env: kubectl against the OnPremises cluster (mise run onprem:kubectl -- get nodes)"
+dir = "{{config_root}}"
+shell = "bash -c"
+# mise appends the task arguments to the last line.
+run = '''
+source dev/onprem/env.sh
+exec kubectl --kubeconfig "$ONPREM_KUBECONFIG"
+'''
+
+["onprem:k9s"]
+description = "OnPremises env: k9s against the OnPremises cluster"
+dir = "{{config_root}}"
+shell = "bash -c"
+run = '''
+source dev/onprem/env.sh
+exec k9s --kubeconfig "$ONPREM_KUBECONFIG"
+'''
+
+["onprem:ssh"]
+description = "OnPremises env: shell into a VM (NODE=sdui-w0 mise run onprem:ssh; default the control plane)"
+dir = "{{config_root}}"
+shell = "bash -c"
+run = '''
+source dev/onprem/env.sh
+exec limactl shell "${NODE:-$(onprem_cp_vm)}"
+'''
+
+# === Tests ===
+
+["onprem:test-render"]
+description = "OnPremises env: render the config with fake IPs and check it (no VMs needed; runs anywhere)"
+dir = "{{config_root}}"
+run = "bash tests/onprem/render-test.sh"

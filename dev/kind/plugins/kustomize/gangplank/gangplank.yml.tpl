@@ -1,0 +1,13 @@
+clusterName: "sd-ui"
+apiServerURL: "https://api.${NIP_DOMAIN}"
+clusterCAPath: "/tls/ca.crt"
+authorizeURL: "https://login.${NIP_DOMAIN}/auth"
+tokenURL: "https://login.${NIP_DOMAIN}/token"
+trustedCAPath: "/tls/ca.crt"
+clientID: "oidc-auth-client"
+clientSecret: "${GANGPLANK_CLIENT_SECRET}"
+redirectURL: "https://gangplank.${NIP_DOMAIN}/callback"
+scopes: ["openid", "profile", "email", "offline_access", "groups"]
+usernameClaim: "email"
+emailClaim: "email"
+sessionSecurityKey: "${GANGPLANK_SESSION_KEY}"

@@ -1,0 +1,11 @@
+proxy:
+  enabled: true
+
+manager:
+  options:
+    capsuleUserGroups: ["oidc:capsule.clastix.io","capsule.clastix.io"]
+
+certManager:
+  generateCertificates: true
+
+replicaCount: 1

@@ -1,0 +1,4 @@
+# Used by `mise run lint-scripts` (and editors). `# shellcheck source=` directives are
+# relative to the script that contains them.
+source-path=SCRIPTDIR
+external-sources=true

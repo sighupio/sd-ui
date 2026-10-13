@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crasher
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crasher
+  template:
+    metadata:
+      labels:
+        app: crasher
+    spec:
+      containers:
+        - name: crasher
+          image: busybox:1.37
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting up..."
+              SECS=$((30 + RANDOM % 60))
+              echo "Will crash in ${SECS}s"
+              sleep $SECS
+              echo "Fatal error: out of cheese"
+              exit 1
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 10m
+              memory: 32Mi
