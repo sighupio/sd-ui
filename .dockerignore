@@ -1,0 +1,10 @@
+# Only plugins/ goes into the image; keep the build context small and the
+# plugins-build stage independent of whatever is installed on the host.
+plugins/*/node_modules
+plugins/*/.eslintcache
+.git
+.furyctl
+.build
+dev/kind/state
+dev/onprem/state
+dev/kind/registry-cache/data

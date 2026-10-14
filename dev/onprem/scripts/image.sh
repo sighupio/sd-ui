@@ -27,7 +27,7 @@ fi
 
 TAG="dev-$(date +%Y%m%d%H%M%S)"
 PUSH_REF="localhost:${ONPREM_REGISTRY_PORT}/sd-ui:${TAG}"
-docker buildx build --platform linux/arm64 -t "$PUSH_REF" --push "$PROJECT_DIR"
+docker buildx build --platform linux/arm64 --build-arg PLUGINS_SOURCE=local -t "$PUSH_REF" --push "$PROJECT_DIR"
 
 mkdir -p "$STATE_DIR"
 cat > "$STATE_DIR/image.env" <<EOF

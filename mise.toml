@@ -166,6 +166,7 @@ run = "mise run down && mise run clean"
 description = "start tilt for Headlamp hot-reload"
 # Tilt watches plugins/*/dist/ and plugins/*/package.json (ignores src/, node_modules/).
 # When dist/main.js changes (after `npm run build`), Tilt rebuilds the Docker image
+# (PLUGINS_SOURCE=local: it packages the host-built dist/, CI compiles from source)
 # and redeploys the Headlamp pod automatically.
 # Access Headlamp at https://headlamp.<NIP_DOMAIN>
 run = "tilt up"
@@ -180,7 +181,7 @@ description = "install dependencies for all SD plugins"
 run = """
 for dir in plugins/sd-*/; do
   echo "=== Installing $(basename $dir) ==="
-  (cd "$dir" && npm install) || exit 1
+  (cd "$dir" && npm ci) || exit 1
 done
 echo "All plugin dependencies installed"
 """

@@ -4,6 +4,8 @@ docker_build(
   ref=registry_url,
   context='.',
   dockerfile='Dockerfile',
+  # Package the dist/main.js built on the host (`npm run build`) instead of compiling in Docker
+  build_args={'PLUGINS_SOURCE': 'local'},
   only=['plugins/'],
   ignore=[
     'plugins/*/node_modules',

@@ -216,11 +216,7 @@ npm run lint
 npm run build
 ```
 
-After building, add the plugin to the `Dockerfile`:
-```dockerfile
-COPY plugins/sd-example/dist/main.js /headlamp/plugins/sd-example/main.js
-COPY plugins/sd-example/package.json /headlamp/plugins/sd-example/package.json
-```
+No `Dockerfile` change is needed: it builds every `plugins/sd-*` directory from source. Commit `src/`, `package.json` and `package-lock.json`; `dist/` is gitignored.
 
 Tilt watches `plugins/*/dist/` and `plugins/*/package.json` (ignores node_modules, src, etc.) and rebuilds automatically.
 

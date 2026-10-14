@@ -530,12 +530,13 @@ Three plugins use the Prometheus service proxy (`prometheus-k8s:9090`):
 
 ### Plugin Development Workflow with Tilt
 
-The Tiltfile watches `plugins/` but ignores development files (node_modules, src, eslintcache, tsconfig, package-lock) — it only triggers a rebuild when `dist/main.js` or `package.json` changes:
+The Tiltfile builds the image with `PLUGINS_SOURCE=local`: instead of compiling the plugins in Docker (what CI does) it packages the `dist/main.js` built on the host, so the loop stays fast. It watches `plugins/` but ignores development files (node_modules, src, eslintcache, tsconfig, package-lock) — it only triggers a rebuild when `dist/main.js` or `package.json` changes:
 
 ```python
 docker_build(
   ref=registry_url,
   only=['plugins/'],
+  build_args={'PLUGINS_SOURCE': 'local'},
   ignore=['plugins/*/node_modules', 'plugins/*/src', ...],
 )
 ```
