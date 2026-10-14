@@ -7,17 +7,6 @@ node_modules/
 # Plugin packages (`headlamp-plugin package`); dist/main.js is committed for the Dockerfile
 *.tgz
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
 # Host IP (user-specific, required for nip.io DNS)
 host-ip.txt
 
