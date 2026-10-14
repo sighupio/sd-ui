@@ -57,7 +57,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.17.0' # keep in sync with the Dockerfile and mise.toml
           cache: 'npm'
           cache-dependency-path: plugins/${{ matrix.plugin }}/package-lock.json
 
