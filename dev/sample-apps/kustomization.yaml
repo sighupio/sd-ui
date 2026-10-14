@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces.yaml
+  - ingresses.yaml
+  - shop/
+  - sock-shop/
+  - chaos-test/
+  - chaos/shop/
+  - chaos/sock-shop/
+  - chaos/chaos-test/

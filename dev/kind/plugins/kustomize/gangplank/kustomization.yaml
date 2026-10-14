@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kube-system
+
+resources:
+  - deploy.yml
+  - ingress.yml
+
+secretGenerator:
+  - name: gangplank
+    files:
+      - gangplank.yml
+    options:
+      disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: html-templates
+    files:
+      - html-templates/home.tmpl
+      - html-templates/commandline.tmpl
+    options:
+      disableNameSuffixHash: true
+
+patches:
+  - path: trusted-ca-patch.yaml
+
+images:
+  - name: registry.sighup.io/fury/gangplank
+    newTag: "1.1.1"

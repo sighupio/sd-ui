@@ -1,0 +1,187 @@
+---
+apiVersion: kfd.sighup.io/v1alpha2
+kind: KFDDistribution
+metadata:
+  name: sd-ui
+spec:
+  distributionVersion: v1.36.0
+  distribution:
+    kubeconfig: "{env://KUBECONFIG}"
+    common:
+      networkPoliciesEnabled: false
+    modules:
+      networking:
+        type: cilium
+        cilium:
+          podCidr: 10.244.0.0/16
+          maskSize: "24"
+      ingress:
+        baseDomain: "{env://NIP_DOMAIN}"
+        nginx:
+          type: single
+          tls:
+            provider: certManager
+        certManager:
+          clusterIssuer:
+            name: letsencrypt-fury
+            email: dev@sighup.io
+            type: http01
+      logging:
+        type: loki
+        minio:
+          storageSize: 20Gi
+          rootUser:
+            username: minio
+            password: minio123
+        loki:
+          backend: minio
+          tsdbStartDate: "2026-03-19"
+        opensearch:
+          type: single
+          storageSize: 20Gi
+      monitoring:
+        type: prometheus
+        prometheus:
+          retentionTime: 3d
+          retentionSize: 5GiB
+          storageSize: 5Gi
+        prometheusAgent:
+          remoteWrite: []
+        mimir:
+          retentionTime: 3d
+          backend: minio
+        minio:
+          storageSize: 20Gi
+          rootUser:
+            username: minio
+            password: minio123
+      tracing:
+        type: none
+        minio:
+          storageSize: 20Gi
+          rootUser:
+            username: minio
+            password: minio123
+      # utilities is supported only by OnPremises/Immutable in v1.36
+      # (not KFDDistribution), so it's commented out.
+      # utilities:
+      #   headlamp:
+      #     type: sso
+      #     oidcGroup: <oidc-group>
+      #     # Alternative: token-auth, binds the Headlamp ServiceAccount to an existing ClusterRole
+      #     # type: token-auth
+      #     # clusterRole: view
+      policy:
+        type: kyverno
+        kyverno:
+          additionalExcludedNamespaces: ["local-path-storage"]
+          validationFailureAction: Audit
+          installDefaultPolicies: true
+        gatekeeper:
+          additionalExcludedNamespaces: ["local-path-storage"]
+          enforcementAction: warn
+          installDefaultPolicies: true
+      dr:
+        type: on-premises
+        velero: {}
+      auth:
+        provider:
+          type: sso
+        pomerium:
+          policy: |
+            - from: https://headlamp.{env://NIP_DOMAIN}
+              to: http://headlamp.headlamp.svc.cluster.local:80
+              set_request_headers:
+                Authorization: "Bearer ${pomerium.id_token}"
+              allow_websockets: true
+              preserve_host_header: true
+              policy:
+                - allow:
+                    and:
+                      - authenticated_user: true
+          secrets:
+            COOKIE_SECRET: "{file://./state/secrets/pomerium/cookie_secret.txt}"
+            IDP_CLIENT_SECRET: "{file://./state/secrets/pomerium/idp_client_secret.txt}"
+            SHARED_SECRET: "{file://./state/secrets/pomerium/shared_secret.txt}"
+            SIGNING_KEY: "{file://./state/secrets/pomerium/signing_key.txt}"
+        baseDomain: "{env://NIP_DOMAIN}"
+        oidcTrustedCA: "{file://./state/certs/ca.crt}"
+        dex:
+          additionalStaticClients:
+            - id: oidc-auth-client
+              name: "OIDC Kubernetes Auth"
+              redirectURIs:
+                - "https://gangplank.{env://NIP_DOMAIN}/callback"
+              secret: "{file://./state/secrets/gangplank/client_secret.txt}"
+          connectors:
+            - type: ldap
+              id: ldap
+              name: LDAP
+              config:
+                host: ldap-server.demo-ldap.svc:389
+                insecureNoSSL: true
+                bindDN: CN=admin,DC=sighup,DC=io
+                bindPW: admin
+                userSearch:
+                  baseDN: ou=people,DC=sighup,DC=io
+                  filter: "(objectClass=person)"
+                  username: cn
+                  idAttr: cn
+                  emailAttr: mail
+                  nameAttr: displayName
+                groupSearch:
+                  baseDN: DC=sighup,DC=io
+                  filter: "(objectClass=groupOfNames)"
+                  userMatchers:
+                    - userAttr: DN
+                      groupAttr: member
+                  nameAttr: cn
+    customPatches:
+      patches:
+        - patch: |-
+            - op: replace
+              path: /metadata/annotations/cert-manager.io~1cluster-issuer
+              value: kind-ca
+          target:
+            kind: Ingress
+        - patch: |-
+            - op: add
+              path: /metadata/labels/kubernetes.io~1metadata.name
+              value: nginx
+          target:
+            kind: IngressClass
+            name: nginx
+      patchesStrategicMerge:
+        - |
+          $patch: delete
+          apiVersion: apps/v1
+          kind: DaemonSet
+          metadata:
+            name: x509-certificate-exporter-control-plane
+            namespace: monitoring
+  plugins:
+    helm:
+      repositories:
+        - name: projectcapsule
+          url: https://projectcapsule.github.io/charts
+      releases:
+        - name: capsule
+          namespace: capsule-system
+          chart: projectcapsule/capsule
+          version: "0.12.4"
+          disableValidationOnInstall: true
+          values:
+            - ./plugins/helm/capsule/values.yaml
+    kustomize:
+      - name: kind-ca-issuer
+        folder: ./plugins/kustomize/kind-ca-issuer
+      - name: ldap-server
+        folder: ./plugins/kustomize/ldap-server
+      - name: capsule-rbac
+        folder: ./plugins/kustomize/capsule-rbac
+      - name: tenants
+        folder: ./plugins/kustomize/tenants
+      - name: gangplank
+        folder: ./plugins/kustomize/gangplank
+      - name: capsule-proxy-ingress
+        folder: ./plugins/kustomize/capsule-proxy-ingress

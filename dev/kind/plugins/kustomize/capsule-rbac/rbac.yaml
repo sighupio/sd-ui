@@ -1,0 +1,163 @@
+# Allow Capsule users to get specific ingresses for sd-core plugin links
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sd-ingress-reader
+rules:
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sd-ingress-reader
+subjects:
+  - kind: Group
+    name: capsule.clastix.io
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sd-ingress-reader
+---
+# Allow Capsule users to proxy to Loki for sd-loki-events plugin
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sd-loki-proxy
+rules:
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    resourceNames: ["loki-stack", "loki-stack:3100"]
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sd-loki-proxy
+subjects:
+  - kind: Group
+    name: capsule.clastix.io
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sd-loki-proxy
+---
+# Allow Capsule users to proxy to Prometheus for sd-certificates plugin
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sd-prometheus-proxy
+rules:
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    resourceNames: ["prometheus-k8s", "prometheus-k8s:9090"]
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sd-prometheus-proxy
+subjects:
+  - kind: Group
+    name: capsule.clastix.io
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sd-prometheus-proxy
+---
+# Allow Capsule users to view Velero backup/schedule/restore CRDs for sd-backups plugin
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sd-velero-viewer
+rules:
+  - apiGroups: ["velero.io"]
+    resources: ["backups", "schedules", "restores"]
+    verbs: ["list", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sd-velero-viewer
+subjects:
+  - kind: Group
+    name: capsule.clastix.io
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sd-velero-viewer
+---
+# Allow Capsule users to view PolicyReports for sd-policy plugin
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sd-policy-viewer
+rules:
+  - apiGroups: ["wgpolicyk8s.io"]
+    resources: ["policyreports", "clusterpolicyreports"]
+    verbs: ["list", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sd-policy-viewer
+subjects:
+  - kind: Group
+    name: capsule.clastix.io
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sd-policy-viewer
+---
+# Allow Capsule users to proxy to OpenSearch for sd-events plugin
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sd-opensearch-proxy
+rules:
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    resourceNames: ["opensearch-cluster-master", "opensearch-cluster-master:9200"]
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sd-opensearch-proxy
+subjects:
+  - kind: Group
+    name: capsule.clastix.io
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sd-opensearch-proxy
+---
+# Allow Capsule users to view Gatekeeper constraints for sd-policy plugin
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sd-gatekeeper-viewer
+rules:
+  - apiGroups: ["constraints.gatekeeper.sh"]
+    resources: ["*"]
+    verbs: ["list", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sd-gatekeeper-viewer
+subjects:
+  - kind: Group
+    name: capsule.clastix.io
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sd-gatekeeper-viewer
