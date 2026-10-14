@@ -51,7 +51,7 @@ Each feature is a Headlamp plugin:
 
 | SD UI    | Headlamp  | Utilities Module | SIGHUP Distribution |
 | -------- | --------- | ---------------- | ------------------- |
-| `v0.1.1` | `v0.40.1` | `v0.1.1`         | `v1.36.0`           |
+| `v1.0.0` | `v0.40.1` | `v0.1.1`         | `v1.36.0`           |
 
 The plugins adapt to the flavor of each SD module (e.g. Loki or OpenSearch, Kyverno or Gatekeeper): see the [flavor compatibility matrix](docs/SD_COMPATIBILITY.md).
 
