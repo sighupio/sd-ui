@@ -180,8 +180,14 @@ run = "tilt up"
 
 [tasks.plugins-install]
 description = "install dependencies for all SD plugins"
+# npm ci wipes node_modules, so skip the plugins already installed from the current
+# lockfile (npm writes node_modules/.package-lock.json at the end of every install).
 run = """
 for dir in plugins/sd-*/; do
+  if [ "$dir/node_modules/.package-lock.json" -nt "$dir/package-lock.json" ]; then
+    echo "=== $(basename $dir): dependencies up to date ==="
+    continue
+  fi
   echo "=== Installing $(basename $dir) ==="
   (cd "$dir" && npm ci) || exit 1
 done

@@ -148,7 +148,7 @@ mise run demo-apps-down
 
 | Command | Description |
 |---------|------------|
-| `mise run plugins-install` | `npm install` for all SD plugins. |
+| `mise run plugins-install` | `npm ci` for the SD plugins whose `node_modules` is older than their `package-lock.json`. |
 | `mise run plugins-build` | Install deps + type-check + lint + build all plugins. |
 | `mise run plugins-tsc` | Type-check only. |
 | `mise run plugins-lint` | Lint only. |
