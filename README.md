@@ -61,7 +61,7 @@ The image is published as `registry.sighup.io/fury/sd-ui`, and as `registry.sigh
 
 The manifests that deploy it are part of the [Utilities Module][utilities-repo]: [`furyctl`][furyctl-repo] deploys it when you create or update an OnPremises or Immutable cluster with `spec.distribution.modules.utilities.headlamp` enabled in your `furyctl.yaml`. See the module documentation for the [configuration][utilities-config], and its [examples][utilities-examples] to deploy the UI with `kustomize` on other clusters.
 
-To install SD from scratch, follow the [Getting started][getting-started] guide.
+To install SD from scratch, follow one of the [Getting started][getting-started] guides.
 
 ## Development
 
