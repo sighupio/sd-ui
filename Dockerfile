@@ -15,6 +15,7 @@ RUN mkdir -p /plugins && \
 
 # The bundles are plain JavaScript, so both plugin stages run on the build platform
 # (no QEMU) and every target platform reuses the same /out/<plugin>/{main.js,package.json}.
+# Node version: keep in sync with mise.toml and node-version in the pipeline
 FROM --platform=$BUILDPLATFORM node:22.17.0-alpine AS plugins-build
 WORKDIR /src
 COPY plugins/ plugins/
