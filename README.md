@@ -71,7 +71,7 @@ The development environment is a Kind cluster with the whole SD stack (SSO, Caps
 mise install
 echo '<your machine IP>' > host-ip.txt
 mise run up    # Kind cluster + SIGHUP Distribution + showcase apps
-mise run dev   # Tilt: Headlamp with hot-reload of the plugins
+mise run dev   # build the plugins, then Tilt: Headlamp with hot-reload of the plugins
 ```
 
 See the [Development Guide](docs/DEVELOPMENT.md) for the details.

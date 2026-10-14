@@ -4,7 +4,7 @@
 # Quick start:
 #   echo '<YOUR_IP>' > host-ip.txt   # required: your machine's IP for nip.io DNS
 #   mise run up      # create Kind cluster + install SD + sync CA (~10 min)
-#   mise run dev     # start Tilt for Headlamp hot-reload (separate terminal)
+#   mise run dev     # build the plugins, start Tilt for Headlamp hot-reload (separate terminal)
 #   Open https://headlamp.<NIP_DOMAIN> (printed during setup)
 #   Login: alice/alice (LDAP via Dex)
 #
@@ -20,7 +20,8 @@
 # ============================================================================
 
 [tools]
-node = "22"
+# Keep in sync with the node image in the Dockerfile and node-version in the pipeline
+node = "22.17.0"
 kind = "0.33.0"
 ctlptl = "0.9.6"
 helm = "3.18.3"
@@ -163,9 +164,12 @@ run = "mise run down && mise run clean"
 # === Development (interactive session) ===
 
 [tasks.dev]
-description = "start tilt for Headlamp hot-reload"
+description = "build the plugins and start tilt for Headlamp hot-reload"
+# dist/ is not committed: build it first, Tilt packages it (PLUGINS_SOURCE=local).
+depends = ["plugins-build"]
 # Tilt watches plugins/*/dist/ and plugins/*/package.json (ignores src/, node_modules/).
 # When dist/main.js changes (after `npm run build`), Tilt rebuilds the Docker image
+# (PLUGINS_SOURCE=local: it packages the host-built dist/, CI compiles from source)
 # and redeploys the Headlamp pod automatically.
 # Access Headlamp at https://headlamp.<NIP_DOMAIN>
 run = "tilt up"
@@ -173,14 +177,20 @@ run = "tilt up"
 # === Plugin Build/Test/Lint ===
 # Each SD plugin (plugins/sd-*/) is an independent npm project.
 # headlamp-reevo-theme is pre-built and excluded from these tasks.
-# For a single plugin: cd plugins/<name> && npm install && npm run tsc && npm run build
+# For a single plugin: cd plugins/<name> && npm ci && npm run tsc && npm run build
 
 [tasks.plugins-install]
 description = "install dependencies for all SD plugins"
+# npm ci wipes node_modules, so skip the plugins already installed from the current
+# lockfile (npm writes node_modules/.package-lock.json at the end of every install).
 run = """
 for dir in plugins/sd-*/; do
+  if [ "$dir/node_modules/.package-lock.json" -nt "$dir/package-lock.json" ]; then
+    echo "=== $(basename $dir): dependencies up to date ==="
+    continue
+  fi
   echo "=== Installing $(basename $dir) ==="
-  (cd "$dir" && npm install) || exit 1
+  (cd "$dir" && npm ci) || exit 1
 done
 echo "All plugin dependencies installed"
 """

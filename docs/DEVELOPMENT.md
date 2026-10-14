@@ -20,7 +20,7 @@ echo '192.168.1.10' > host-ip.txt
 # One command to create everything (~10-15 min first time, ~5 min with cached images)
 mise run up
 
-# Start Tilt for Headlamp hot-reload (in a separate terminal)
+# Build the plugins and start Tilt for Headlamp hot-reload (in a separate terminal)
 mise run dev
 ```
 
@@ -139,7 +139,7 @@ mise run demo-apps-down
 | Command | Description |
 |---------|------------|
 | `mise run up` | Create Kind cluster, install distribution, sync CA, deploy showcase apps. Full setup. |
-| `mise run dev` | Start Tilt for Headlamp hot-reload (run in separate terminal). |
+| `mise run dev` | Build all plugins (`plugins-build`), then start Tilt for Headlamp hot-reload (run in separate terminal). |
 | `mise run down` | Tear down cluster. Keeps registry cache for faster rebuilds. |
 | `mise run clean` | Remove `dev/kind/state/` and the furyctl cache: forces a full regeneration on the next `up`. |
 | `mise run nuke` | Destroy everything and wipe state (CA + furyctl cache). Use after IP changes. |
@@ -148,7 +148,7 @@ mise run demo-apps-down
 
 | Command | Description |
 |---------|------------|
-| `mise run plugins-install` | `npm install` for all SD plugins. |
+| `mise run plugins-install` | `npm ci` for the SD plugins whose `node_modules` is older than their `package-lock.json`. |
 | `mise run plugins-build` | Install deps + type-check + lint + build all plugins. |
 | `mise run plugins-tsc` | Type-check only. |
 | `mise run plugins-lint` | Lint only. |
@@ -530,12 +530,13 @@ Three plugins use the Prometheus service proxy (`prometheus-k8s:9090`):
 
 ### Plugin Development Workflow with Tilt
 
-The Tiltfile watches `plugins/` but ignores development files (node_modules, src, eslintcache, tsconfig, package-lock) — it only triggers a rebuild when `dist/main.js` or `package.json` changes:
+The Tiltfile builds the image with `PLUGINS_SOURCE=local`: instead of compiling the plugins in Docker (what CI does) it packages the `dist/main.js` built on the host, so the loop stays fast. It watches `plugins/` but ignores development files (node_modules, src, eslintcache, tsconfig, package-lock) — it only triggers a rebuild when `dist/main.js` or `package.json` changes:
 
 ```python
 docker_build(
   ref=registry_url,
   only=['plugins/'],
+  build_args={'PLUGINS_SOURCE': 'local'},
   ignore=['plugins/*/node_modules', 'plugins/*/src', ...],
 )
 ```

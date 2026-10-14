@@ -6,7 +6,7 @@ This document is for the SIGHUP Distribution UI maintainers. Here you will find 
 
 Releases are fully automated by the pipeline in [`.github/workflows/pipeline.yml`](.github/workflows/pipeline.yml) and are triggered by pushing a version tag.
 
-1. Be sure that the current state of the `main` branch is ready to be released and that every plugin's `dist/main.js` is up to date.
+1. Be sure that the current state of the `main` branch is ready to be released.
 2. Write the release notes in `docs/releases/<tag>.md` (for example `docs/releases/v1.2.3.md`) and merge them into `main`.
 3. Tag `main` and push the tag:
    ```bash

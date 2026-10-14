@@ -81,7 +81,7 @@ this PR can be used as context for that.
 > PRs that do not have this checklist ready won't be reviewed.
 
 - [ ] My PR has a clear scope and does not mix together several unrelated changes
-- [ ] I've rebuilt the plugins I changed and committed their `dist/main.js`
+- [ ] I've committed `package-lock.json` together with any `package.json` dependency change
 - [ ] I've updated the docs under `docs/` if I changed the infrastructure (RBAC, Capsule, auth)
 - [ ] I've tested the proposed changes and wrote the tests performed in the section above
 - [ ] My branch is up-to-date with the target branch and there are no conflicts
