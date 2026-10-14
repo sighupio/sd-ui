@@ -4,7 +4,7 @@
 # Quick start:
 #   echo '<YOUR_IP>' > host-ip.txt   # required: your machine's IP for nip.io DNS
 #   mise run up      # create Kind cluster + install SD + sync CA (~10 min)
-#   mise run dev     # start Tilt for Headlamp hot-reload (separate terminal)
+#   mise run dev     # build the plugins, start Tilt for Headlamp hot-reload (separate terminal)
 #   Open https://headlamp.<NIP_DOMAIN> (printed during setup)
 #   Login: alice/alice (LDAP via Dex)
 #
@@ -163,7 +163,9 @@ run = "mise run down && mise run clean"
 # === Development (interactive session) ===
 
 [tasks.dev]
-description = "start tilt for Headlamp hot-reload"
+description = "build the plugins and start tilt for Headlamp hot-reload"
+# dist/ is not committed: build it first, Tilt packages it (PLUGINS_SOURCE=local).
+depends = ["plugins-build"]
 # Tilt watches plugins/*/dist/ and plugins/*/package.json (ignores src/, node_modules/).
 # When dist/main.js changes (after `npm run build`), Tilt rebuilds the Docker image
 # (PLUGINS_SOURCE=local: it packages the host-built dist/, CI compiles from source)

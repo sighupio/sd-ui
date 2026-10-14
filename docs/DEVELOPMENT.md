@@ -20,7 +20,7 @@ echo '192.168.1.10' > host-ip.txt
 # One command to create everything (~10-15 min first time, ~5 min with cached images)
 mise run up
 
-# Start Tilt for Headlamp hot-reload (in a separate terminal)
+# Build the plugins and start Tilt for Headlamp hot-reload (in a separate terminal)
 mise run dev
 ```
 
@@ -139,7 +139,7 @@ mise run demo-apps-down
 | Command | Description |
 |---------|------------|
 | `mise run up` | Create Kind cluster, install distribution, sync CA, deploy showcase apps. Full setup. |
-| `mise run dev` | Start Tilt for Headlamp hot-reload (run in separate terminal). |
+| `mise run dev` | Build all plugins (`plugins-build`), then start Tilt for Headlamp hot-reload (run in separate terminal). |
 | `mise run down` | Tear down cluster. Keeps registry cache for faster rebuilds. |
 | `mise run clean` | Remove `dev/kind/state/` and the furyctl cache: forces a full regeneration on the next `up`. |
 | `mise run nuke` | Destroy everything and wipe state (CA + furyctl cache). Use after IP changes. |
