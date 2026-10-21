@@ -21,7 +21,7 @@ If you are new to SD please refer to the [official documentation][sd-docs] on ho
 
 ![SIGHUP Distribution UI cluster overview](docs/assets/overview.png)
 
-- **Cluster overview**: a landing page that replaces the default Headlamp overview, with the distribution version, the status of each module and its type (e.g. "opensearch (triple)"), links to the infrastructure UIs (Grafana, Prometheus, OpenSearch Dashboards, Hubble...), resource usage charts, and summary cards for alerts, certificates, backups and policy violations.
+- **Cluster overview**: a landing page that replaces the default Headlamp overview, with the distribution version, the status of each module and its type (e.g. "opensearch (triple)"), links to the infrastructure UIs (Grafana, Prometheus, OpenSearch Dashboards, MinIO, Hubble, Whisker, Gangplank...), resource usage charts, and summary cards for alerts, certificates, backups and policy violations.
 - **Monitoring**: firing Prometheus alerts grouped by rule group, with labels, graph queries and runbook links; X.509 certificate expiry tracking (expired, critical < 7d, warning < 28d).
 - **Events and logs**: historical Kubernetes events and logs from Loki or OpenSearch, and "View Logs" links on the workload detail pages to Grafana Explore or OpenSearch Dashboards.
 - **Backups**: Velero backups, restores and schedules, with error details and volume snapshot stats.
