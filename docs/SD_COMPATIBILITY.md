@@ -21,11 +21,11 @@ Headlamp dependency · ❓ untested (deploy that flavor and confirm).
 | Category | `type` choices (KFD schema) | Sub-variants | Headlamp features that depend on it |
 |---|---|---|---|
 | **monitoring** | `none`, `prometheus`, `prometheusAgent`, `mimir` | — | sd-alerts, sd-certificates, sd-core (alerts+certs cards), sd-prometheus-autoconfig |
-| **logging** | `none`, `loki`, `opensearch`, `customOutputs` | opensearch: `single`\|`triple` | sd-events, sd-logs, sd-loki-links (Grafana *or* OSD button), sd-core (OpenSearch Dashboards link) |
+| **logging** | `none`, `loki`, `opensearch`, `customOutputs` | opensearch: `single`\|`triple` | sd-events, sd-logs, sd-loki-links (Grafana *or* OSD button), sd-core (OpenSearch Dashboards and MinIO links) |
 | **policy** | `none`, `kyverno`, `gatekeeper` | — | sd-policy, sd-core (policy card) |
 | **dr** | `none`, `on-premises` | — | sd-backups, sd-core (backups card) |
-| **networking** | `none`, `calico`, `cilium` | — | sd-core (Hubble UI link only) |
-| **tracing** | `none`, `tempo` | — | ➖ none |
+| **networking** | `none`, `calico`, `cilium` | — | sd-core (Hubble UI / Whisker links only) |
+| **tracing** | `none`, `tempo` | — | sd-core (MinIO link only) |
 | **auth.provider** | `none`, `basicAuth`, `sso` | — | cross-cutting: ingress namespace for every linked UI, sd-core links + Pomerium logout, our katalog overlays |
 | **ingress.nginx / .haproxy** | `none`, `single`, `dual` | — | Headlamp ingress class; sd-core link hosts |
 
@@ -124,12 +124,12 @@ kubectl create job -n logging --from cronjob/index-patterns-cronjob manual-index
 
 ---
 
-## Networking — sd-core Hubble link
+## Networking — sd-core Hubble / Whisker links
 
 | Choice | Status | Behavior |
 |---|---|---|
 | `cilium` | ✅ | Hubble UI useful-link shown. |
-| `calico` | ➖ | No Hubble link (expected — Hubble is Cilium-specific). No other dependency. |
+| `calico` | ✅ | Whisker useful-link shown (ingress `whisker`, `calico-system` ns when not behind SSO). No Hubble link (Hubble is Cilium-specific). |
 | `none` | ➖ | No dependency. |
 
 ---
@@ -137,12 +137,12 @@ kubectl create job -n logging --from cronjob/index-patterns-cronjob manual-index
 ## Auth provider — cross-cutting (affects every linked UI)
 
 `auth.provider.type` decides **where infra ingresses live** and how Headlamp is fronted.
-Plugins carry SSO/non-SSO branches (e.g. `sd-core/src/hooks.ts:262-299`,
+Plugins carry SSO/non-SSO branches (e.g. `sd-core/src/ingressLinks.ts`,
 `sd-loki-links/src/hooks.ts:85-86`).
 
 | Choice | Status | Behavior / what to test |
 |---|---|---|
-| `sso` | ✅ | Ingresses in `pomerium` ns; sd-core reads pomerium-namespace ingresses; Pomerium logout active. In `module-utilities`, `examples/oidc-capsule` targets this **with** Capsule (per-tenant isolation) and `examples/oidc-rbac` targets it **without** Capsule (SSO login + plain RBAC, cluster-wide read). |
+| `sso` | ✅ | Ingresses in `pomerium` ns; sd-core reads pomerium-namespace ingresses (falling back to the module namespace for ingresses with `disableAuth`; Gangplank is always in `kube-system`); Pomerium logout active. In `module-utilities`, `examples/oidc-capsule` targets this **with** Capsule (per-tenant isolation) and `examples/oidc-rbac` targets it **without** Capsule (SSO login + plain RBAC, cluster-wide read). |
 | `basicAuth` | ⚠️❓ | Ingresses in **module** namespaces; sd-core uses the non-SSO namespace set; Pomerium logout inactive. **Test** that links resolve. Our `examples/basic-auth` is an independent front door. |
 | `none` | ⚠️❓ | Similar to `basicAuth` (no SSO front door). **Test** link resolution and Headlamp access model. |
 
@@ -150,7 +150,7 @@ Plugins carry SSO/non-SSO branches (e.g. `sd-core/src/hooks.ts:262-299`,
 
 ## Tracing / Ingress
 
-- **tracing** (`none`, `tempo`): ➖ no Headlamp plugin consumes tracing.
+- **tracing** (`none`, `tempo`): only sd-core consumes it, showing the MinIO link when the ingress exists.
 - **ingress** nginx/haproxy `single`/`dual`: Headlamp + example ingresses hardcode
   `ingressClassName: nginx`. ⚠️ On a `haproxy`-only cluster the class must be changed;
   `none` means no ingress (Headlamp needs alternative access). sd-core reads whatever host
