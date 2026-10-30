@@ -1,6 +1,6 @@
 {
   "name": "sd-loki-links",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Adds View Logs links to resource detail pages — Grafana Explore for Loki, Discover for OpenSearch",
   "scripts": {
     "start": "headlamp-plugin start",

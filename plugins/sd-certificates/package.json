@@ -1,6 +1,6 @@
 {
   "name": "sd-certificates",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "X.509 certificate expiry monitoring via Prometheus for SIGHUP Distribution",
   "scripts": {
     "start": "headlamp-plugin start",
