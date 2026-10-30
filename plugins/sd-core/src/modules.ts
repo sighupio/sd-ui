@@ -1,4 +1,4 @@
-import { getNestedValue } from './sdSpec';
+import { getNestedValue, SdLink } from './sdSpec';
 
 export { getNestedValue };
 
@@ -48,8 +48,9 @@ const KFD_VERSION_NAMES: Record<string, string> = {
 function getModuleType(moduleConfig: Record<string, any> | undefined, moduleName: string): { active: boolean; type: string } {
   if (!moduleConfig) return { active: false, type: 'unknown' };
 
-  const paths = MODULE_TYPE_PATHS[moduleName];
-  if (!paths) return { active: false, type: 'unknown' };
+  // Modules not listed above (e.g. added to the distribution after this plugin) usually
+  // have a top-level `type` too
+  const paths = MODULE_TYPE_PATHS[moduleName] ?? ['type'];
 
   // For component modules: active if ANY component type != none
   if (COMPONENT_MODULES.has(moduleName)) {
@@ -84,16 +85,22 @@ function getModuleType(moduleConfig: Record<string, any> | undefined, moduleName
   return { active: typeStr !== 'none', type: typeStr };
 }
 
-// Build the module list from KFD versions, enriched with config type spec
+// Build the module list from KFD versions, enriched with config type spec. Modules that
+// have links but are not listed above get a row too, so that every link is shown.
 export function buildModules(
   moduleVersions: Record<string, any>,
-  moduleConfigs: Record<string, any>
+  moduleConfigs: Record<string, any>,
+  links: SdLink[] = []
 ): ModuleInfo[] {
-  return Object.keys(MODULE_TYPE_PATHS)
+  const names = new Set([...Object.keys(MODULE_TYPE_PATHS), ...links.map(l => l.module)]);
+
+  return [...names]
     .map(name => {
       const version = moduleVersions[KFD_VERSION_NAMES[name] || name] || '';
       const config = moduleConfigs[name];
-      const { active, type } = getModuleType(config, name);
+      // A module known only from its links has no status to report: leave the type empty
+      const { active, type } =
+        config || MODULE_TYPE_PATHS[name] ? getModuleType(config, name) : { active: false, type: '' };
 
       return {
         name,

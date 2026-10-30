@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useIngressLinks } from './hooks';
+import { useKfdData } from './hooks';
+import { SD_SPEC_DATA_KEY } from './sdSpec';
 
 // vi.mock is hoisted above the imports, so ./hooks gets the mocked K8s.
 
-// Ingresses present in the mocked cluster, keyed by "<namespace>/<name>"
-const cluster: Record<string, any> = {};
+// headlamp/sd-spec ConfigMap returned by the mocked cluster, null while loading
+let configMap: any = null;
 
 // Same shape as Headlamp's useKubeObject result: `.data`/`.error` fields plus an
 // iterator yielding [data, error], without numeric indexes.
@@ -22,36 +23,57 @@ function queryResponse(data: any) {
 vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
   K8s: {
     ResourceClasses: {
-      Ingress: {
-        useGet: (name: string, namespace: string) => queryResponse(cluster[`${namespace}/${name}`] ?? null),
+      ConfigMap: {
+        useGet: () => queryResponse(configMap),
       },
     },
   },
 }));
 
-function ingress(host: string) {
-  return { jsonData: { spec: { rules: [{ host }] } } };
+function sdSpec(spec: unknown) {
+  return { jsonData: { data: { [SD_SPEC_DATA_KEY]: JSON.stringify(spec) } } };
 }
 
-describe('useIngressLinks', () => {
+const SPEC = {
+  distributionVersion: 'v1.36.0',
+  cluster: { name: 'sd-ui', kind: 'OnPremises' },
+  moduleVersions: { monitoring: 'v4.3.0' },
+  modules: { auth: { provider: { type: 'sso' } }, monitoring: { type: 'prometheus' } },
+  links: [
+    { module: 'monitoring', name: 'Grafana', url: 'https://grafana.example.com' },
+    { module: 'auth', name: 'Gangplank', url: 'https://gangplank.example.com' },
+  ],
+};
+
+describe('useKfdData', () => {
   beforeEach(() => {
-    for (const key of Object.keys(cluster)) delete cluster[key];
+    configMap = null;
   });
 
-  it('reads the ingresses returned by useGet', () => {
-    cluster['pomerium/grafana'] = ingress('grafana.example.com');
-    cluster['pomerium/minio-tracing'] = ingress('minio-tracing.example.com');
-    cluster['kube-system/gangplank'] = ingress('gangplank.example.com');
+  it('returns the links listed in the distribution spec', () => {
+    configMap = sdSpec(SPEC);
 
-    expect(useIngressLinks(true)).toEqual([
-      { name: 'Grafana', url: 'https://grafana.example.com', module: 'monitoring' },
-      { name: 'MinIO', url: 'https://minio-tracing.example.com', module: 'tracing' },
-      { name: 'Gangplank', url: 'https://gangplank.example.com', module: 'auth' },
-    ]);
+    expect(useKfdData().links).toEqual(SPEC.links);
   });
 
-  it('returns no links when no ingress exists', () => {
-    expect(useIngressLinks(true)).toEqual([]);
-    expect(useIngressLinks(false)).toEqual([]);
+  it('adds a module row for links of a module the plugin does not know', () => {
+    configMap = sdSpec({
+      ...SPEC,
+      links: [...SPEC.links, { module: 'mesh', name: 'Kiali', url: 'https://kiali.example.com' }],
+    });
+
+    const data = useKfdData();
+
+    expect(data.links.map(l => l.name)).toContain('Kiali');
+    expect(data.modules.find(m => m.name === 'mesh')).toMatchObject({ active: false, type: '' });
+  });
+
+  it('returns no links when the spec does not list them or is still loading', () => {
+    // JSON.stringify drops the undefined field
+    configMap = sdSpec({ ...SPEC, links: undefined });
+    expect(useKfdData().links).toEqual([]);
+
+    configMap = null;
+    expect(useKfdData()).toMatchObject({ loading: true, links: [] });
   });
 });

@@ -1,6 +1,7 @@
 // Distribution summary rendered by the SD distribution templates into the
-// headlamp/sd-spec ConfigMap. It holds only versions, the cluster name/kind and
-// the module types, so plugins never need read access to the furyctl-config Secret.
+// headlamp/sd-spec ConfigMap. It holds only versions, the cluster name/kind, the
+// module types and the links to the infrastructure UIs, so plugins never need read
+// access to the furyctl-config Secret.
 // The distribution renders it only together with Headlamp (utilities module, OnPremises and
 // Immutable): on any other cluster it does not exist and the cluster is treated as non-SD.
 //
@@ -10,6 +11,13 @@ export const SD_SPEC_CONFIGMAP_NAME = 'sd-spec';
 export const SD_SPEC_CONFIGMAP_NAMESPACE = 'headlamp';
 export const SD_SPEC_DATA_KEY = 'info.json';
 
+// Infrastructure UI exposed through an ingress (e.g. Grafana), listed under `module`
+export interface SdLink {
+  module: string;
+  name: string;
+  url: string;
+}
+
 export interface SdSpec {
   distributionVersion: string;
   cluster: { name: string; kind: string };
@@ -17,6 +25,8 @@ export interface SdSpec {
   moduleVersions: Record<string, string>;
   // Subset of spec.distribution.modules with only the `type` fields (e.g. logging.type)
   modules: Record<string, any>;
+  // Empty when rendered by a distribution version that does not list the links
+  links: SdLink[];
 }
 
 export interface SdSpecResult {
@@ -44,6 +54,26 @@ function isObject(value: unknown): value is Record<string, any> {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+// The URLs end up in an href: keep only http(s) ones
+function isHttpUrl(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+
+    return protocol === 'https:' || protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function parseLinks(value: unknown): SdLink[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter(isObject)
+    .map(link => ({ module: asString(link.module), name: asString(link.name), url: asString(link.url) }))
+    .filter(link => link.module && link.name && isHttpUrl(link.url));
 }
 
 // Parse the ConfigMap `data`. Returns null when the key is missing or is not valid JSON.
@@ -76,6 +106,7 @@ export function parseSdSpec(data: Record<string, string> | undefined): SdSpec | 
     cluster: { name: asString(cluster.name), kind: asString(cluster.kind) },
     moduleVersions,
     modules: isObject(parsed.modules) ? parsed.modules : {},
+    links: parseLinks(parsed.links),
   };
 }
 

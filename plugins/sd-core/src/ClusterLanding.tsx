@@ -19,7 +19,7 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { KfdData, UsefulLink, useIngressLinks, useKfdData } from './hooks';
+import { KfdData, useKfdData } from './hooks';
 
 function OverviewCharts() {
   const [nodes] = K8s.ResourceClasses.Node.useList();
@@ -153,7 +153,7 @@ function OverviewCharts() {
   );
 }
 
-function SdInfoSection({ kfdData, links }: { kfdData: KfdData; links: UsefulLink[] }) {
+function SdInfoSection({ kfdData }: { kfdData: KfdData }) {
   const [nodes] = K8s.ResourceClasses.Node.useList();
 
   const nodeList = nodes || [];
@@ -266,7 +266,7 @@ function SdInfoSection({ kfdData, links }: { kfdData: KfdData; links: UsefulLink
                   </TableHead>
                   <TableBody>
                     {kfdData.modules.map(mod => {
-                      const moduleLinks = links.filter(l => l.module === mod.name);
+                      const moduleLinks = kfdData.links.filter(l => l.module === mod.name);
 
                       return (
                         <TableRow key={mod.name}>
@@ -282,12 +282,14 @@ function SdInfoSection({ kfdData, links }: { kfdData: KfdData; links: UsefulLink
                             )}
                           </TableCell>
                           <TableCell>
-                            <Chip
-                              label={mod.active ? mod.type : 'none'}
-                              size="small"
-                              color={mod.active ? 'success' : 'default'}
-                              variant={mod.active ? 'filled' : 'outlined'}
-                            />
+                            {mod.type && (
+                              <Chip
+                                label={mod.active ? mod.type : 'none'}
+                                size="small"
+                                color={mod.active ? 'success' : 'default'}
+                                variant={mod.active ? 'filled' : 'outlined'}
+                              />
+                            )}
                           </TableCell>
                           <TableCell>
                             {moduleLinks.map(link => (
@@ -652,7 +654,6 @@ function PolicySummary({ policyType }: { policyType: string }) {
 
 export default function ClusterLanding() {
   const kfdData = useKfdData();
-  const links = useIngressLinks(kfdData.isSso);
 
   // Still loading — show spinner
   if (kfdData.loading) {
@@ -675,7 +676,7 @@ export default function ClusterLanding() {
   // SIGHUP Distribution cluster — show SD info + overview charts + summaries
   return (
     <Box pb={3}>
-      <SdInfoSection kfdData={kfdData} links={links} />
+      <SdInfoSection kfdData={kfdData} />
       <OverviewCharts />
       <AlertsSummary />
       <CertsSummary />

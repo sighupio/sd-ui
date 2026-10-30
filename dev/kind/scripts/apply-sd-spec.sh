@@ -35,6 +35,40 @@ fi
 INFO_JSON="$(jq -n --argjson cfg "$CONFIG_JSON" --argjson kfd "$KFD_JSON" '
   ($cfg.spec.distribution.modules // {}) as $m
   | def str(v): v // "none" | tostring;
+  # furyctl resolves {env://VAR} at apply time: do the same for the hosts
+  def resolve: if type == "string" and test("^\\{env://.+\\}$") then $ENV[.[7:-1]] // "" else . end;
+  # Override host, otherwise prefix + base domain (auth links use the auth base domain)
+  def link($mod; $pkg; $prefix; $name):
+    (($m[$mod].overrides.ingresses[$pkg].host // "") | resolve) as $host
+    | (if $mod == "auth" then $m.auth.baseDomain else $m.ingress.baseDomain end | resolve) as $base
+    | { module: $mod, name: $name, url: ("https://" + (if $host != "" then $host else $prefix + $base end)) };
+  # Kind always has a StorageClass, the storageClassAvailable check is always true. Backends
+  # default to minio, as in the distribution defaults
+  def links($m):
+    ((str($m.ingress.nginx.type) != "none") or (str($m.ingress.haproxy.type) != "none")
+      or ($m.ingress.byoic.enabled // false)) as $hasAnyIngress
+    | [
+      if $m.auth.oidcKubernetesAuth.enabled then link("auth"; "gangplank"; "gangplank."; "Gangplank") else empty end,
+      if $hasAnyIngress then
+        link("ingress"; "forecastle"; "directory."; "Forecastle"),
+        (str($m.logging.type) as $t | if $t == "loki" or $t == "opensearch" then
+          (if $t == "opensearch" then link("logging"; "opensearchDashboards"; "opensearch-dashboards."; "OpenSearch Dashboards") else empty end),
+          link("logging"; "minio"; "minio-logging."; "MinIO")
+        else empty end),
+        (str($m.monitoring.type) as $t | if $t == "prometheus" or $t == "mimir" then
+          link("monitoring"; "grafana"; "grafana."; "Grafana"),
+          link("monitoring"; "prometheus"; "prometheus."; "Prometheus"),
+          link("monitoring"; "alertmanager"; "alertmanager."; "Alertmanager"),
+          (if $t == "mimir" and ($m.monitoring.mimir.backend // "minio") == "minio" then link("monitoring"; "minio"; "minio-monitoring."; "MinIO") else empty end)
+        else empty end),
+        (str($m.networking.type) as $t
+          | if $t == "calico" then link("networking"; "whisker"; "whisker."; "Whisker")
+            elif $t == "cilium" then link("networking"; "hubble"; "hubble."; "Hubble UI")
+            else empty end),
+        (if str($m.policy.type) == "gatekeeper" then link("policy"; "gpm"; "gpm."; "Gatekeeper Policy Manager") else empty end),
+        (if str($m.tracing.type) == "tempo" and ($m.tracing.tempo.backend // "minio") == "minio" then link("tracing"; "minio"; "minio-tracing."; "MinIO") else empty end)
+      else empty end
+    ];
   {
     distributionVersion: ($kfd.version // $cfg.spec.distributionVersion | tostring),
     cluster: { name: $cfg.metadata.name, kind: $cfg.kind },
@@ -52,7 +86,8 @@ INFO_JSON="$(jq -n --argjson cfg "$CONFIG_JSON" --argjson kfd "$KFD_JSON" '
           haproxy: { type: str($m.ingress.haproxy.type) }
         },
         utilities: { headlamp: { type: str($m.utilities.headlamp.type) } }
-      })
+      }),
+    links: links($m)
   }')"
 
 kubectl create namespace headlamp --dry-run=client -o yaml | kubectl apply -f - >/dev/null

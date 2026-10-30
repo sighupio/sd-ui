@@ -490,9 +490,13 @@ For non-SD clusters, it falls back to rendering the standard overview charts onl
 
 We tried using `registerOverviewChartsProcessor` first, but it places components in a 300px-max grid alongside the default charts — not suitable for full-width sections.
 
-### Service Links from Ingress Resources
+### Service Links
 
-The distribution creates ingress resources for each infrastructure service (Grafana, Prometheus, AlertManager, etc.). With SSO (Pomerium), all ingresses are in the `pomerium` namespace. Without SSO, they are in their module namespace (monitoring, logging, etc.).
+The links in the module table come from the `links` list of the `headlamp/sd-spec` ConfigMap: one `{module, name, url}` entry per infrastructure UI the distribution exposes through an ingress, rendered only when that ingress is. sd-core shows each link next to its module, and adds a row for a module it does not know, so a new module or UI needs a change in the distribution template only. A distribution version that does not render `links` shows no links. On Kind, `dev/kind/scripts/apply-sd-spec.sh` renders the same list from `dev/kind/furyctl.yaml`.
+
+### Ingress Hosts in the Other Plugins
+
+The distribution creates ingress resources for each infrastructure service (Grafana, Prometheus, AlertManager, etc.). With SSO (Pomerium), all ingresses are in the `pomerium` namespace. Without SSO, they are in their module namespace (monitoring, logging, etc.). sd-alerts and sd-loki-links read the host of a specific ingress (Prometheus, Grafana, OpenSearch Dashboards) to build their deep links.
 
 Since Capsule blocks `list` of ingresses outside the tenant, we use individual `useGet` calls for each known ingress. React hooks cannot be called conditionally or in loops, so all `useGet` calls are declared statically (for both SSO and non-SSO namespaces) and the correct set is selected based on the auth config:
 

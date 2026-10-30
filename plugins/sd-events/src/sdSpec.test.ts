@@ -19,6 +19,10 @@ const SPEC = {
     logging: { type: 'opensearch', opensearch: { type: 'triple' } },
     monitoring: { type: 'prometheus' },
   },
+  links: [
+    { module: 'auth', name: 'Gangplank', url: 'https://gangplank.example.com' },
+    { module: 'monitoring', name: 'Grafana', url: 'https://grafana.internal.example.com' },
+  ],
 };
 
 function configMap(spec: unknown) {
@@ -68,6 +72,7 @@ describe('parseSdSpec', () => {
         cluster: 'x',
         moduleVersions: { monitoring: 'v4.3.0', logging: 5 },
         modules: [],
+        links: {},
       }),
     });
 
@@ -76,7 +81,36 @@ describe('parseSdSpec', () => {
       cluster: { name: '', kind: '' },
       moduleVersions: { monitoring: 'v4.3.0' },
       modules: {},
+      links: [],
     });
+  });
+
+  it('has no links when rendered by a distribution version that does not list them', () => {
+    const { links, ...withoutLinks } = SPEC;
+    const spec = parseSdSpec({ [SD_SPEC_DATA_KEY]: JSON.stringify(withoutLinks) });
+
+    expect(links).not.toHaveLength(0);
+    expect(spec?.links).toEqual([]);
+  });
+
+  it('drops incomplete links and links that are not http(s)', () => {
+    const valid = { module: 'monitoring', name: 'Grafana', url: 'https://grafana.example.com' };
+    const spec = parseSdSpec({
+      [SD_SPEC_DATA_KEY]: JSON.stringify({
+        ...SPEC,
+        links: [
+          valid,
+          'https://x.example.com',
+          { ...valid, module: '' },
+          { ...valid, name: 5 },
+          { ...valid, url: 'grafana.example.com' },
+          { ...valid, url: 'javascript:alert(1)' },
+          { ...valid, url: 'http://plain.example.com' },
+        ],
+      }),
+    });
+
+    expect(spec?.links).toEqual([valid, { ...valid, url: 'http://plain.example.com' }]);
   });
 
   it('keeps empty module versions rendered by a furyctl without kfd data', () => {

@@ -11,7 +11,7 @@
 #                  OR opensearch-cluster-master:9200/proxy/kubernetes-*,infra-*/_search
 #   • sd-loki-links -> Grafana button (loki) OR OSD Discover button (opensearch)
 #                      (frontend; not curl-testable here — the ingress it needs is asserted)
-#   • sd-core       -> OpenSearch Dashboards ingress link, opensearch ONLY
+#   • sd-core       -> OpenSearch Dashboards link from sd-spec, opensearch ONLY
 #
 # Backend services are curl-tested exactly as the plugins call them (GET for
 # Loki, POST _search for OpenSearch). Frontend button/link RENDERING is out of
@@ -33,7 +33,7 @@ _LOKI_LABELS="${_LOKI_PREFIX}/loki/api/v1/labels"
 _LOKI_NS_VALUES="${_LOKI_PREFIX}/loki/api/v1/label/namespace/values"
 _OS_PREFIX="/api/v1/namespaces/logging/services/opensearch-cluster-master:9200/proxy"
 _OS_SEARCH="${_OS_PREFIX}/kubernetes-*,infra-*/_search"
-# sd-core reads the opensearch-dashboards ingress (pomerium ns under SSO,
+# sd-loki-links reads the opensearch-dashboards ingress (pomerium ns under SSO,
 # logging ns otherwise). RBAC lets the tenant `get` ingresses cluster-wide.
 _OSD_SSO="/apis/networking.k8s.io/v1/namespaces/pomerium/ingresses/opensearch-dashboards"
 _OSD_NOSSO="/apis/networking.k8s.io/v1/namespaces/logging/ingresses/opensearch-dashboards"
@@ -113,11 +113,23 @@ _osd_index_patterns() { # [attempts=_LOG_DATA_RETRIES]
   done
 }
 
-# sd-core OpenSearch Dashboards ingress present (SSO ns first, then non-SSO).
+# OpenSearch Dashboards ingress present (SSO ns first, then non-SSO).
 _osd_ingress() {
   probe "$_OSD_SSO";   [ "$PROBE_STATUS" = "200" ] && { CRIT=ok; return; }
   probe "$_OSD_NOSSO"; [ "$PROBE_STATUS" = "200" ] && { CRIT=ok; return; }
   CRIT=notok
+}
+
+# sd-core OpenSearch Dashboards link listed in sd-spec, pointing at the ingress host.
+_osd_link() {
+  local url host
+  CRIT=notok
+  url="$(config_link_url logging "OpenSearch Dashboards")"
+  [ -n "$url" ] || return 0
+  _osd_ingress
+  [ "$CRIT" = "ok" ] || return 0
+  host="$(jq -r '.spec.rules[0].host // ""' < "$PROBE_BODY_FILE" 2>/dev/null)"
+  [ "$url" = "https://$host" ] && CRIT=ok || CRIT=notok
 }
 
 checks_logging() {
@@ -154,10 +166,12 @@ checks_logging() {
       record "logging: sd-events/logs opensearch reachable" "$CRIT" must  "HTTP $PROBE_STATUS"
       _os_has_data
       record "logging: sd-logs opensearch has data"         "$CRIT" must  "HTTP $PROBE_STATUS, indexed docs"
-      # Same ingress backs sd-core's link and sd-loki-links' "View logs in OpenSearch"
-      # button, so this one probe covers both.
+      # sd-loki-links' "View logs in OpenSearch" button reads this ingress.
       _osd_ingress
-      record "logging: sd-core + sd-loki-links OSD ingress" "$CRIT" must  "HTTP $PROBE_STATUS"
+      record "logging: sd-loki-links OSD ingress"           "$CRIT" must  "HTTP $PROBE_STATUS"
+      # sd-core's link comes from sd-spec and must point at the same host.
+      _osd_link
+      record "logging: sd-core OSD link (sd-spec)"          "$CRIT" must  "sd-spec link vs ingress host"
       # The OSD button also needs the index patterns; without them Discover reports
       # SavedObjectNotFound. `up` seeds them (dev/kind/scripts/seed-opensearch-index-patterns.sh)
       # instead of waiting out the hourly CronJob, so this is a hard assertion.

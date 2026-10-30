@@ -112,6 +112,27 @@ describe('buildModules', () => {
     const modules = buildModules(KFD_VERSIONS, { tracing: { type: 'none' } });
     expect(findModule(modules, 'tracing')).toMatchObject({ active: false, type: 'none' });
   });
+
+  it('adds a row for modules known only from their links, without a status', () => {
+    const links = [
+      { module: 'monitoring', name: 'Grafana', url: 'https://grafana.example.com' },
+      { module: 'mesh', name: 'Kiali', url: 'https://kiali.example.com' },
+      { module: 'mesh', name: 'Jaeger', url: 'https://jaeger.example.com' },
+    ];
+    const modules = buildModules({ ...KFD_VERSIONS, mesh: 'v1.0.0' }, {}, links);
+
+    expect(modules.filter(m => m.name === 'mesh')).toEqual([
+      { name: 'mesh', version: 'v1.0.0', type: '', active: false, icon: 'mdi:puzzle' },
+    ]);
+    expect(modules.map(m => m.name)).toEqual([...modules.map(m => m.name)].sort());
+  });
+
+  it('reads the top-level type of a module the plugin does not know', () => {
+    const links = [{ module: 'mesh', name: 'Kiali', url: 'https://kiali.example.com' }];
+    const modules = buildModules(KFD_VERSIONS, { mesh: { type: 'istio' } }, links);
+
+    expect(findModule(modules, 'mesh')).toMatchObject({ active: true, type: 'istio' });
+  });
 });
 
 describe('buildModules from the sd-spec ConfigMap', () => {

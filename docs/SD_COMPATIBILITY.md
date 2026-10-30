@@ -129,7 +129,7 @@ kubectl create job -n logging --from cronjob/index-patterns-cronjob manual-index
 | Choice | Status | Behavior |
 |---|---|---|
 | `cilium` | ✅ | Hubble UI useful-link shown. |
-| `calico` | ✅ | Whisker useful-link shown (ingress `whisker`, `calico-system` ns when not behind SSO). No Hubble link (Hubble is Cilium-specific). |
+| `calico` | ✅ | Whisker useful-link shown. No Hubble link (Hubble is Cilium-specific). |
 | `none` | ➖ | No dependency. |
 
 ---
@@ -137,24 +137,24 @@ kubectl create job -n logging --from cronjob/index-patterns-cronjob manual-index
 ## Auth provider — cross-cutting (affects every linked UI)
 
 `auth.provider.type` decides **where infra ingresses live** and how Headlamp is fronted.
-Plugins carry SSO/non-SSO branches (e.g. `sd-core/src/ingressLinks.ts`,
-`sd-loki-links/src/hooks.ts:85-86`).
+sd-alerts and sd-loki-links carry SSO/non-SSO branches (e.g. `sd-loki-links/src/hooks.ts`).
+sd-core links do not depend on it: their URLs come from the `links` list of `headlamp/sd-spec`.
 
 | Choice | Status | Behavior / what to test |
 |---|---|---|
-| `sso` | ✅ | Ingresses in `pomerium` ns; sd-core reads pomerium-namespace ingresses (falling back to the module namespace for ingresses with `disableAuth`; Gangplank is always in `kube-system`); Pomerium logout active. In `module-utilities`, `examples/oidc-capsule` targets this **with** Capsule (per-tenant isolation) and `examples/oidc-rbac` targets it **without** Capsule (SSO login + plain RBAC, cluster-wide read). |
-| `basicAuth` | ⚠️❓ | Ingresses in **module** namespaces; sd-core uses the non-SSO namespace set; Pomerium logout inactive. **Test** that links resolve. Our `examples/basic-auth` is an independent front door. |
+| `sso` | ✅ | Ingresses in `pomerium` ns; Pomerium logout active. In `module-utilities`, `examples/oidc-capsule` targets this **with** Capsule (per-tenant isolation) and `examples/oidc-rbac` targets it **without** Capsule (SSO login + plain RBAC, cluster-wide read). |
+| `basicAuth` | ⚠️❓ | Ingresses in **module** namespaces; Pomerium logout inactive. **Test** that links resolve. Our `examples/basic-auth` is an independent front door. |
 | `none` | ⚠️❓ | Similar to `basicAuth` (no SSO front door). **Test** link resolution and Headlamp access model. |
 
 ---
 
 ## Tracing / Ingress
 
-- **tracing** (`none`, `tempo`): only sd-core consumes it, showing the MinIO link when the ingress exists.
+- **tracing** (`none`, `tempo`): only sd-core consumes it, showing the MinIO link when the distribution renders it (`tempo` with the `minio` backend).
 - **ingress** nginx/haproxy `single`/`dual`: Headlamp + example ingresses hardcode
   `ingressClassName: nginx`. ⚠️ On a `haproxy`-only cluster the class must be changed;
-  `none` means no ingress (Headlamp needs alternative access). sd-core reads whatever host
-  the ingress advertises, so link display is class-agnostic.
+  `none` means no ingress (Headlamp needs alternative access). sd-core links come from
+  `headlamp/sd-spec`, so link display is class-agnostic.
 
 ---
 

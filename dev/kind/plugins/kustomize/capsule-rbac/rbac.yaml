@@ -1,4 +1,4 @@
-# Allow Capsule users to get specific ingresses for sd-core plugin links
+# Allow Capsule users to get specific ingresses for the sd-alerts and sd-loki-links deep links
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

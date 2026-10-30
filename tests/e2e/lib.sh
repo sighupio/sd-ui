@@ -14,6 +14,7 @@
 #   get_token                          fresh OIDC id-token for the tenant user
 #   probe <api-path>                   curl the Capsule Proxy; sets PROBE_STATUS / PROBE_BODY_FILE
 #   config_module_type <module>        modules.<module>.type as the plugin would read it
+#   config_link_url <module> <name>    url of the sd-core link listed in sd-spec, or ''
 #   record <name> <ok|notok> <must|xfail> <detail>   assertion + report row
 #   summary                            print totals; exit non-zero on FAIL/XPASS
 #
@@ -188,6 +189,18 @@ config_module_type() {
     return 0
   fi
   jq -r --arg m "$1" '(.data["info.json"] // "{}") | fromjson | .modules[$m].type // ""' \
+    < "$PROBE_BODY_FILE" 2>/dev/null
+}
+
+# --- links.<module, name>.url as sd-core reads it (sd-spec) ------------------
+config_link_url() {
+  probe "/api/v1/namespaces/headlamp/configmaps/sd-spec"
+  if [ "$PROBE_STATUS" != "200" ]; then
+    echo ""
+    return 0
+  fi
+  jq -r --arg m "$1" --arg n "$2" '(.data["info.json"] // "{}") | fromjson
+    | [.links // [] | .[] | select(.module == $m and .name == $n) | .url][0] // ""' \
     < "$PROBE_BODY_FILE" 2>/dev/null
 }
 
