@@ -196,7 +196,7 @@ mise run desktop-build
 
 Output: `.build/headlamp-desktop/app/dist/Headlamp-*.dmg`
 
-First run clones Headlamp v0.40.1 and installs dependencies (~15 min). Subsequent runs ~5 min.
+First run clones Headlamp v0.46.0 and installs dependencies (~15 min). Subsequent runs ~5 min.
 
 > The app is unsigned. On first launch: `xattr -dr com.apple.quarantine /Applications/Headlamp.app`
 
@@ -441,7 +441,7 @@ Secrets are generated once per machine and never rotated by a re-run (rotating o
 Tilt watches `plugins/` and rebuilds the Headlamp Docker image on changes:
 
 ```
-Dockerfile: FROM headlamp:v0.40.1 + COPY plugins/
+Dockerfile: FROM headlamp:v0.46.0 + COPY plugins/
     ↓
 docker_build → localhost:5000/headlamp-sd:dev
     ↓

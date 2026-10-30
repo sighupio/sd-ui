@@ -44,7 +44,7 @@ RUN set -eu; \
 
 FROM plugins-${PLUGINS_SOURCE} AS plugins
 
-FROM registry.sighup.io/fury/headlamp:v0.40.1
+FROM registry.sighup.io/fury/headlamp:v0.46.0
 
 # Official plugins (from downloader stage)
 COPY --from=plugins-downloader /plugins/cert-manager/ /headlamp/plugins/cert-manager/
