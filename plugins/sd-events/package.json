@@ -1,6 +1,6 @@
 {
   "name": "sd-events",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Historical Kubernetes events from Loki or OpenSearch for SIGHUP Distribution",
   "scripts": {
     "start": "headlamp-plugin start",

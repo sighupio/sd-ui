@@ -1,6 +1,6 @@
 {
   "name": "sd-prometheus-autoconfig",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Auto-configures the Prometheus plugin for SIGHUP Distribution clusters",
   "scripts": {
     "start": "headlamp-plugin start",

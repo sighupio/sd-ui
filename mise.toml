@@ -258,7 +258,7 @@ description = "build Headlamp desktop app with SD plugins for macOS"
 depends = ["plugins-build"]
 run = """
 set -e
-HEADLAMP_VERSION="v0.40.1"
+HEADLAMP_VERSION="v0.46.0"
 HEADLAMP_DIR=".build/headlamp-desktop"
 
 # Clone headlamp (shallow, single branch)
