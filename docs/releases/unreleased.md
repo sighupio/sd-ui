@@ -11,7 +11,7 @@ This release bumps [Headlamp](https://headlamp.dev) to `v0.46.0`.
 
 ## Included plugins
 
-No functional plugin changes since `v1.0.0`.
+`sd-core` now lists the service links rendered by the distribution instead of a hardcoded set.
 
 | Plugin                     | Version  | Description                                                                                |
 | -------------------------- | -------- | ------------------------------------------------------------------------------------------ |
@@ -32,3 +32,4 @@ No functional plugin changes since `v1.0.0`.
 - Base image bumped to `registry.sighup.io/fury/headlamp:v0.46.0`.
 - The `desktop-build` task now builds Headlamp Desktop from the `v0.46.0` tag.
 - Plugin `package.json` versions aligned to `1.0.0`, the version published in the `v1.0.0` release notes (they were still `0.1.0`).
+- `sd-core` reads the service links from the `links` list of the `headlamp/sd-spec` ConfigMap, so a new module or UI needs a change in the distribution template only. Modules known only from their links get their own row. A distribution version that does not render `links` shows no links. The other plugins' `sdSpec.ts` parser is updated to keep the shared copy identical.
