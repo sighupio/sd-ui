@@ -1,6 +1,6 @@
 {
   "name": "headlamp-reevo-theme",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Dark theme and logo for the SIGHUP Distribution UI",
   "scripts": {
     "start": "headlamp-plugin start",

@@ -6,6 +6,10 @@
 #                     the fast inner loop of Tilt and the OnPremises dev environment
 ARG PLUGINS_SOURCE=build
 
+# Headlamp base image tag. No default: the single source of truth is HEADLAMP_VERSION in the
+# [env] of mise.toml, passed by `mise run image-build`, Tilt, the OnPremises image and CI.
+ARG HEADLAMP_VERSION
+
 # Download official Headlamp plugins from GitHub Releases
 FROM --platform=$BUILDPLATFORM alpine:3.21 AS plugins-downloader
 RUN apk add --no-cache wget
@@ -44,7 +48,7 @@ RUN set -eu; \
 
 FROM plugins-${PLUGINS_SOURCE} AS plugins
 
-FROM registry.sighup.io/fury/headlamp:v0.40.1
+FROM registry.sighup.io/fury/headlamp:${HEADLAMP_VERSION:?build-arg-required}
 
 # Official plugins (from downloader stage)
 COPY --from=plugins-downloader /plugins/cert-manager/ /headlamp/plugins/cert-manager/

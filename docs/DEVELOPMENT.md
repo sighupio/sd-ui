@@ -169,6 +169,12 @@ mise run demo-apps-down
 |---------|------------|
 | `mise run desktop-build` | Build Headlamp Electron app for macOS with SD plugins. |
 
+### Image
+
+| Command | Description |
+|---------|------------|
+| `mise run image-build` | Build the SD-UI image `sd-ui:dev` for the local platform, plugins compiled from source as in CI. |
+
 ### Low-level (usually not needed directly)
 
 | Command | Description |
@@ -196,7 +202,7 @@ mise run desktop-build
 
 Output: `.build/headlamp-desktop/app/dist/Headlamp-*.dmg`
 
-First run clones Headlamp v0.40.1 and installs dependencies (~15 min). Subsequent runs ~5 min.
+First run clones Headlamp at `HEADLAMP_VERSION` (the `[env]` of `mise.toml`) and installs dependencies (~15 min). Subsequent runs ~5 min; after a `HEADLAMP_VERSION` bump the clone is replaced.
 
 > The app is unsigned. On first launch: `xattr -dr com.apple.quarantine /Applications/Headlamp.app`
 
@@ -441,7 +447,7 @@ Secrets are generated once per machine and never rotated by a re-run (rotating o
 Tilt watches `plugins/` and rebuilds the Headlamp Docker image on changes:
 
 ```
-Dockerfile: FROM headlamp:v0.40.1 + COPY plugins/
+Dockerfile: FROM headlamp:$HEADLAMP_VERSION + COPY plugins/
     ↓
 docker_build → localhost:5000/headlamp-sd:dev
     ↓
@@ -536,7 +542,7 @@ The Tiltfile builds the image with `PLUGINS_SOURCE=local`: instead of compiling 
 docker_build(
   ref=registry_url,
   only=['plugins/'],
-  build_args={'PLUGINS_SOURCE': 'local'},
+  build_args={'PLUGINS_SOURCE': 'local', 'HEADLAMP_VERSION': headlamp_version},
   ignore=['plugins/*/node_modules', 'plugins/*/src', ...],
 )
 ```

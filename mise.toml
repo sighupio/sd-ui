@@ -36,6 +36,10 @@ jq = "1.8.1"
 yq = "4.33.3"
 
 [env]
+# Headlamp version: the base image tag (registry.sighup.io/fury/headlamp) and the tag the
+# Desktop app is built from. Single source of truth: the image builds (image-build, Tilt,
+# onprem:image, CI) and desktop-build read it from here. Bump it here only.
+HEADLAMP_VERSION = "v0.46.0"
 # Kind dev environment: exports HOST_IP and NIP_DOMAIN (from host-ip.txt, e.g.
 # 10-250-250-137.nip.io), KUBECONFIG (dev/kind/state/kubeconfig) and the KIND_* paths.
 _.source = "./dev/kind/env.sh"
@@ -174,6 +178,13 @@ depends = ["plugins-build"]
 # Access Headlamp at https://headlamp.<NIP_DOMAIN>
 run = "tilt up"
 
+# === Image ===
+
+[tasks.image-build]
+description = "build the SD-UI image for the local platform, plugins compiled from source (like CI)"
+# Headlamp base image tag from HEADLAMP_VERSION ([env] above).
+run = 'docker build --build-arg HEADLAMP_VERSION="$HEADLAMP_VERSION" -t sd-ui:dev .'
+
 # === Plugin Build/Test/Lint ===
 # Each SD plugin (plugins/sd-*/) is an independent npm project.
 # headlamp-reevo-theme is pre-built and excluded from these tasks.
@@ -258,8 +269,14 @@ description = "build Headlamp desktop app with SD plugins for macOS"
 depends = ["plugins-build"]
 run = """
 set -e
-HEADLAMP_VERSION="v0.40.1"
+# HEADLAMP_VERSION comes from [env] above
 HEADLAMP_DIR=".build/headlamp-desktop"
+
+# A clone of another Headlamp version (HEADLAMP_VERSION bumped since the last build): re-clone
+if [ -d "$HEADLAMP_DIR" ] && [ "$(git -C "$HEADLAMP_DIR" describe --tags --exact-match 2>/dev/null)" != "$HEADLAMP_VERSION" ]; then
+  echo "=== $HEADLAMP_DIR is not Headlamp $HEADLAMP_VERSION, removing it ==="
+  rm -rf "$HEADLAMP_DIR"
+fi
 
 # Clone headlamp (shallow, single branch)
 if [ ! -d "$HEADLAMP_DIR" ]; then

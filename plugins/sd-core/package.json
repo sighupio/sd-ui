@@ -1,6 +1,6 @@
 {
   "name": "sd-core",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Cluster landing page with SIGHUP Distribution info, module status and summary cards",
   "scripts": {
     "start": "headlamp-plugin start",
