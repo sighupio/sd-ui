@@ -1,11 +1,16 @@
 registry_url = 'localhost:5000/headlamp-sd:dev'
 
+# Headlamp base image tag: HEADLAMP_VERSION from the [env] of mise.toml (`mise run dev`)
+headlamp_version = os.getenv('HEADLAMP_VERSION', '')
+if not headlamp_version:
+  fail('HEADLAMP_VERSION is not set: start Tilt with `mise run dev`')
+
 docker_build(
   ref=registry_url,
   context='.',
   dockerfile='Dockerfile',
   # Package the dist/main.js built on the host (`npm run build`) instead of compiling in Docker
-  build_args={'PLUGINS_SOURCE': 'local'},
+  build_args={'PLUGINS_SOURCE': 'local', 'HEADLAMP_VERSION': headlamp_version},
   only=['plugins/'],
   ignore=[
     'plugins/*/node_modules',

@@ -30,6 +30,10 @@ Besides the lint and build jobs that run on every push (see [`docs/CONTRIBUTING.
 
 Release notes: if `docs/releases/<tag>.md` exists, it is used as the release body (with a Docker images section appended); otherwise GitHub auto-generates the notes from commit history.
 
+## Bumping Headlamp
+
+Change `HEADLAMP_VERSION` in the `[env]` of `mise.toml`, nothing else: the `Dockerfile` base image tag (CI, Tilt, `onprem:image`, `image-build`) and the `desktop-build` tag are read from it. The tag must exist both as `registry.sighup.io/fury/headlamp:<version>` and in [kubernetes-sigs/headlamp](https://github.com/kubernetes-sigs/headlamp/tags).
+
 ## Quick rules of thumb
 
 - **Tag `vX.Y.Z-rc.N`**: an image and a pre-release "Preview" for testing. Does **not** move `latest`.

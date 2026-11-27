@@ -27,7 +27,9 @@ fi
 
 TAG="dev-$(date +%Y%m%d%H%M%S)"
 PUSH_REF="localhost:${ONPREM_REGISTRY_PORT}/sd-ui:${TAG}"
-docker buildx build --platform linux/arm64 --build-arg PLUGINS_SOURCE=local -t "$PUSH_REF" --push "$PROJECT_DIR"
+# HEADLAMP_VERSION: from the [env] of mise.toml (run through `mise run onprem:image`)
+docker buildx build --platform linux/arm64 --build-arg PLUGINS_SOURCE=local \
+  --build-arg HEADLAMP_VERSION="${HEADLAMP_VERSION:?HEADLAMP_VERSION not set: run mise run onprem:image}" -t "$PUSH_REF" --push "$PROJECT_DIR"
 
 mkdir -p "$STATE_DIR"
 cat > "$STATE_DIR/image.env" <<EOF

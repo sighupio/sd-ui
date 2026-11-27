@@ -31,4 +31,5 @@ No functional plugin changes since `v1.0.0`.
 
 - Base image bumped to `registry.sighup.io/fury/headlamp:v0.46.0`.
 - The `desktop-build` task now builds Headlamp Desktop from the `v0.46.0` tag.
+- The Headlamp version is declared once, as `HEADLAMP_VERSION` in the `[env]` of `mise.toml`: the `Dockerfile` takes it as a required build argument (passed by CI, Tilt, `onprem:image` and the new `image-build` task) and `desktop-build` clones that tag, re-cloning when it changes.
 - Plugin `package.json` versions aligned to `1.0.0`, the version published in the `v1.0.0` release notes (they were still `0.1.0`).

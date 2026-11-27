@@ -100,6 +100,17 @@ jobs:
         with:
           platforms: arm64
 
+      - name: Read the Headlamp version from mise.toml
+        id: headlamp
+        run: |
+          version=$(yq -p toml -o yaml '.env.HEADLAMP_VERSION' mise.toml)
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "HEADLAMP_VERSION not found in the [env] of mise.toml" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Headlamp version: $version"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -127,6 +138,8 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: ${{ startsWith(github.ref, 'refs/tags/') }}
+          build-args: |
+            HEADLAMP_VERSION=${{ steps.headlamp.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
